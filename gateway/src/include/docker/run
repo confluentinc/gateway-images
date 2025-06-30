@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+echo "===> Configuring Gateway..."
+
+# Run the configure script to validate environment
+/usr/bin/docker/configure
+
+# Set default config file if not specified
+if [ -z "$GATEWAY_CONFIG_FILE" ]; then
+  export GATEWAY_CONFIG_FILE="/etc/gateway/gateway-config.yaml"
+fi
+
+# Template the configuration file if template exists
+if [ -f "${GATEWAY_CONFIG_FILE}.template" ]; then
+  echo "===> Templating configuration file..."
+  dub template "${GATEWAY_CONFIG_FILE}.template" "$GATEWAY_CONFIG_FILE"
+fi
+
+# Set up classpath - use gateway-docker path as that's where dependencies are placed
+GATEWAY_CLASSPATH="/usr/share/java/gateway-docker/*"
+
+# Prepare JVM arguments
+JVM_ARGS="$GATEWAY_JVM_OPTS"
+
+# Add logging configuration if available
+if [ -f "/etc/gateway/log4j2.yaml" ]; then
+  JVM_ARGS="$JVM_ARGS -Dlog4j2.configurationFile=/etc/gateway/log4j2.yaml"
+fi
+
+echo "===> Launching Gateway..."
+echo "Configuration file: $GATEWAY_CONFIG_FILE"
+echo "JVM Args: $JVM_ARGS"
+
+exec java $JVM_ARGS \
+  -cp "$GATEWAY_CLASSPATH" \
+  io.confluent.gateway.app.GatewayApplication \
+  --config "$GATEWAY_CONFIG_FILE"
