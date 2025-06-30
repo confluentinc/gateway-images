@@ -49,8 +49,4 @@
       </plugin>
     </plugins>
   </build>
-
-  <modules>
-    <module>gateway</module>
-  </modules>
 </project>
