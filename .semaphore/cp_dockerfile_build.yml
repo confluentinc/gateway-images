@@ -31,19 +31,26 @@ global_job_config:
       - export GIT_COMMIT=$(git rev-parse --verify HEAD --short)
       - export BUILD_NUMBER=$(echo $SEMAPHORE_WORKFLOW_ID | cut -f1 -d"-")
       - export BRANCH_TAG=$(echo $SEMAPHORE_GIT_BRANCH | tr / -)
-      # For PR Builds using Packaging
-      - pip install confluent-release-tools
-      - if [ $BRANCH_TAG == "master" ]; then export BUILD_KEY=$(pinto get-master-version); else export BUILD_KEY=$BRANCH_TAG; fi
-      - export PACKAGING_BUCKET="s3://dev-confluent-packages-654654529379-us-west-2/$BRANCH_TAG/"
-      - export LATEST_PACKAGING_BUILD_NUMBER=$(aws s3 ls $PACKAGING_BUCKET --no-paginate | grep 'PRE' | awk '{print $NF}' | awk '{print substr($1, 1, length($1)-1)}' | sort -n | tail -n 1)
-      # Check if version is complete, otherwise use the previous version
-      - (aws s3 ls $PACKAGING_BUCKET$LATEST_PACKAGING_BUILD_NUMBER/deb/ && aws s3 ls $PACKAGING_BUCKET$LATEST_PACKAGING_BUILD_NUMBER/rpm/ && aws s3 ls $PACKAGING_BUCKET$LATEST_PACKAGING_BUILD_NUMBER/archive/)
-        || export LATEST_PACKAGING_BUILD_NUMBER=$(aws s3 ls $PACKAGING_BUCKET --no-paginate | grep 'PRE' | awk '{print $NF}' | awk '{print substr($1, 1, length($1)-1)}' | sort -n | tail -n 2 | head -n 1)
-      - export CONFLUENT_VERSION=$(pinto get-version --build $BUILD_KEY --key confluent.version)
-      - export DEFAULT_OS_TYPE="ubi"
-      - export URL_CONFLUENT_VERSION=$(echo $CONFLUENT_VERSION | awk -F . '{print $1"."$2}')
-      - export PACKAGES_URL="https://s3-us-west-2.amazonaws.com/dev-confluent-packages-654654529379-us-west-2/$BRANCH_TAG/$LATEST_PACKAGING_BUILD_NUMBER/PACKAGE_TYPE/$URL_CONFLUENT_VERSION"
-      - export PACKAGING_BUILD_NUMBER=$LATEST_PACKAGING_BUILD_NUMBER
+      # Semaphore does not accept empty values for parameters.
+      - export ALLOW_UNSIGNED=$(echo $ALLOW_UNSIGNED | awk '{ print tolower($0) }')
+      - >-
+        echo """
+        Parameters:
+        ==========================
+        CONFLUENT_VERSION: $CONFLUENT_VERSION
+        PACKAGES_URL: $PACKAGES_URL
+        PACKAGES_MAVEN_URL: $PACKAGES_MAVEN_URL
+        PACKAGING_BUILD_NUMBER: $PACKAGING_BUILD_NUMBER
+        ALLOW_UNSIGNED: $ALLOW_UNSIGNED
+        CONFLUENT_DEB_VERSION: $CONFLUENT_DEB_VERSION
+        """
+      - if [[ $BRANCH_TAG =~ "-rc" ]]; then export IS_RC="true"; fi
+      - if [[ $BRANCH_TAG =~ "-cp" ]]; then export IS_HOTFIX="true"; fi
+      - if [[ $BRANCH_TAG =~ "-post" ]]; then export IS_POST="true"; fi
+      - if [[ $BRANCH_TAG =~ "-beta" ]]; then export IS_BETA="true"; fi
+      - if [[ $BRANCH_TAG =~ "-alpha" ]]; then export IS_PREVIEW="true"; fi
+      - if [[ $IS_RC || $IS_HOTFIX || $IS_POST || $IS_BETA || $IS_PREVIEW ]]; then export IS_RELEASE="true"; fi
+
       - >-
         if [[ $IS_BETA || $IS_HOTFIX || $IS_POST ]]; then
             export PLATFORM_LABEL=$(echo $BRANCH_TAG | awk -F - '{print "~"$2}')
@@ -110,7 +117,8 @@ blocks:
   - name: Build, Test, & Scan AMD
     dependencies: ["Validation"]
     run:
-      when: "pull_request =~ '.*'"
+      # don't run the tests on non-functional changes...
+      when: "change_in('/', {exclude: ['/.deployed-versions/', '.github/'], default_branch: 'master'})"
     task:
       jobs:
         - name: Build, Test, & Scan ubi9
@@ -137,10 +145,41 @@ blocks:
             - . publish-test-results
             - artifact push workflow target/test-results
             - artifact push workflow target --destination target-AMD
+  - name: Deploy AMD confluentinc/gateway
+    dependencies: ["Build, Test, & Scan AMD"]
+    run:
+      when: "branch = 'master' or branch =~ '^[0-9]+\\.[0-9]+\\.x$' or branch =~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-cp[0-9]+)?(-rc[0-9]+)?$'"
+    task:
+      jobs:
+        - name: Deploy AMD confluentinc/gateway ubi9
+          env_vars:
+            - name: DOCKER_IMAGE
+              value: confluentinc/gateway
+          commands:
+            - export OS_TAG="-ubi9"
+            - export PROD_IMAGE_NAME=${DOCKER_PROD_REGISTRY}confluentinc/gateway
+            - export GIT_COMMIT_TAG=$GIT_COMMIT$OS_TAG$AMD_ARCH
+            - export BRANCH_BUILD_TAG=$BRANCH_TAG-$BUILD_NUMBER$OS_TAG$AMD_ARCH
+            - export DEV_IMAGE_FULL=${DOCKER_DEV_REGISTRY}confluentinc/gateway:$DOCKER_DEV_TAG$OS_TAG$AMD_ARCH
+            - docker pull $DEV_IMAGE_FULL
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - docker push $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - docker push $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - sign-images $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - sign-images $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - export PACKAGE_TAG=$BRANCH_TAG-$PACKAGING_BUILD_NUMBER$OS_TAG$AMD_ARCH
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - docker push $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - sign-images $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - export LATEST_PUSH_TAG=$LATEST_TAG$OS_TAG$AMD_ARCH
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
+            - docker push $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
   - name: Build & Test ARM
     dependencies: ["Validation"]
     run:
-      when: "pull_request =~ '.*'"
+      # don't run the tests on non-functional changes...
+      when: "change_in('/', {exclude: ['/.deployed-versions/', '.github/'], default_branch: 'master'})"
     task:
       agent:
         machine:
@@ -165,6 +204,76 @@ blocks:
             - . publish-test-results
             - artifact push workflow target/test-results
             - artifact push workflow target --destination target-ARM
+  - name: Deploy ARM confluentinc/gateway
+    dependencies: ["Build & Test ARM"]
+    run:
+      when: "branch = 'master' or branch =~ '^[0-9]+\\.[0-9]+\\.x$' or branch =~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-cp[0-9]+)?(-rc[0-9]+)?$'"
+    task:
+      agent:
+        machine:
+          type: s1-prod-ubuntu24-04-arm64-1
+      jobs:
+        - name: Deploy ARM confluentinc/gateway ubi9
+          env_vars:
+            - name: DOCKER_IMAGE
+              value: confluentinc/gateway
+          commands:
+            - export OS_TAG="-ubi9"
+            - export PROD_IMAGE_NAME=${DOCKER_PROD_REGISTRY}confluentinc/gateway
+            - export GIT_COMMIT_TAG=$GIT_COMMIT$OS_TAG$ARM_ARCH
+            - export BRANCH_BUILD_TAG=$BRANCH_TAG-$BUILD_NUMBER$OS_TAG$ARM_ARCH
+            - export DEV_IMAGE_FULL=${DOCKER_DEV_REGISTRY}confluentinc/gateway:$DOCKER_DEV_TAG$OS_TAG$ARM_ARCH
+            - docker pull $DEV_IMAGE_FULL
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - docker push $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - docker push $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - sign-images $PROD_IMAGE_NAME:$GIT_COMMIT_TAG
+            - sign-images $PROD_IMAGE_NAME:$BRANCH_BUILD_TAG
+            - export PACKAGE_TAG=$BRANCH_TAG-$PACKAGING_BUILD_NUMBER$OS_TAG$ARM_ARCH
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - docker push $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - sign-images $PROD_IMAGE_NAME:$PACKAGE_TAG
+            - export LATEST_PUSH_TAG=$LATEST_TAG$OS_TAG$ARM_ARCH
+            - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
+            - docker push $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
+  - name: Create Manifest and Maven Deploy
+    dependencies: ["Deploy AMD confluentinc/gateway", "Deploy ARM confluentinc/gateway"]
+    run:
+      when: "branch = 'master' or branch =~ '^[0-9]+\\.[0-9]+\\.x$' or branch =~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-cp[0-9]+)?(-rc[0-9]+)?$'"
+    task:
+      jobs:
+        - name: Create Manifest and Maven Deploy
+          commands:
+            - export DOCKER_PROD_IMAGE_NAME=$DOCKER_PROD_REGISTRY${DOCKER_REPOS// / $DOCKER_PROD_REGISTRY}
+            - ci-tools ci-update-version
+            - ci-tools ci-push-tag
+            - |-
+              if [[ ! $IS_RELEASE && ! $IS_PREVIEW ]]; then
+                mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker -DaltDeploymentRepository=confluent-codeartifact-internal::default::https://confluent-519856050701.d.codeartifact.us-west-2.amazonaws.com/maven/maven-snapshots/ -DrepositoryId=confluent-codeartifact-internal deploy -DskipTests -Ddocker.skip-build=true -Ddocker.skip-test=true  $MAVEN_EXTRA_ARGS
+              fi
+            # Create manifest
+            - >-
+              for image in $DOCKER_PROD_IMAGE_NAME;
+              do
+                export OS_TAG="-ubi9"
+                export GIT_TAG=$GIT_COMMIT$OS_TAG
+                docker manifest create $image:$GIT_TAG $image:$GIT_TAG$AMD_ARCH $image:$GIT_TAG$ARM_ARCH
+                docker manifest push $image:$GIT_TAG
+                docker pull $image:$GIT_TAG
+                sign-images $image:$GIT_TAG
+                export BRANCH_BUILD_TAG=$BRANCH_TAG-$BUILD_NUMBER$OS_TAG
+                docker manifest create $image:$BRANCH_BUILD_TAG $image:$BRANCH_BUILD_TAG$AMD_ARCH $image:$BRANCH_BUILD_TAG$ARM_ARCH
+                docker manifest push $image:$BRANCH_BUILD_TAG
+                docker pull $image:$BRANCH_BUILD_TAG
+                sign-images $image:$BRANCH_BUILD_TAG
+                export PACKAGE_TAG=$BRANCH_TAG-$PACKAGING_BUILD_NUMBER$OS_TAG
+                docker manifest create $image:$PACKAGE_TAG $image:$PACKAGE_TAG$AMD_ARCH $image:$PACKAGE_TAG$ARM_ARCH
+                docker manifest push $image:$PACKAGE_TAG
+                export LATEST_MANIFEST_TAG=$LATEST_TAG$OS_TAG
+                docker manifest create $image:$LATEST_MANIFEST_TAG $image:$LATEST_MANIFEST_TAG$AMD_ARCH $image:$LATEST_MANIFEST_TAG$ARM_ARCH
+                docker manifest push $image:$LATEST_MANIFEST_TAG
+              done
 after_pipeline:
   task:
     agent:
