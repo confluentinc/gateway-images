@@ -56,4 +56,5 @@ RUN chmod +x /usr/bin/docker/run
 
 USER appuser
 
+# entrypoint script is used to set up the environment and run the gateway
 CMD ["/etc/confluent/docker/run"]
