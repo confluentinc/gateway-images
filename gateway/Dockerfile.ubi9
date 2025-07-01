@@ -44,7 +44,7 @@ USER root
 
 # target directory must be one of the projects that gateway-run-class sets on the GATEWAY_CLASSPATH,
 # of which the artifact ID (gateway-docker) is used directly
-ADD --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/java/${ARTIFACT_ID}/* /usr/share/java/gateway-docker/
+ADD --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/java/${ARTIFACT_ID}/* /usr/share/java/gateway/
 ADD --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/bin/* /usr/bin/
 ADD --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/etc/* /etc/gateway/
 
