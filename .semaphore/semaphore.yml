@@ -62,7 +62,7 @@ global_job_config:
               fi
           fi
           # Overwrite maven global configuration
-          # . vault-sem-get-secret maven-settings-cp-dockerfile
+          . vault-sem-get-secret maven-settings-cp-dockerfile
         else
           echo "This job is not a isHotfixJob or isRcJob (What we know how to handle) - and we don't know how to handle it"
         fi
