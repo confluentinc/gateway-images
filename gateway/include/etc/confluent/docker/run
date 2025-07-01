@@ -31,7 +31,7 @@ if [ -f "${GATEWAY_CONFIG_FILE}.template" ]; then
 fi
 
 # Set up classpath - use gateway-docker path as that's where dependencies are placed
-GATEWAY_CLASSPATH="/usr/share/java/gateway-docker/*"
+GATEWAY_CLASSPATH="/usr/share/java/gateway/*"
 
 # Prepare JVM arguments
 JVM_ARGS="$GATEWAY_JVM_OPTS"

@@ -50,8 +50,8 @@ ADD --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/etc
 
 COPY --chown=appuser:appuser include/etc/confluent/docker /etc/confluent/docker
 
-RUN chmod +x /usr/bin/docker/configure
-RUN chmod +x /usr/bin/docker/run
+RUN chmod +x /etc/confluent/docker/configure
+RUN chmod +x /etc/confluent/docker/run
 
 USER appuser
 
