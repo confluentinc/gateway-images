@@ -1,0 +1,36 @@
+#!/bin/bash
+# Gateway Project Main Script
+
+#
+# Use shellcheck to lint this file
+#
+
+base_dir=$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )
+
+: "${GATEWAY_CONFIG_DIR:="$base_dir/config"}"
+
+# log4j settings
+if [ -z "$GATEWAY_LOG4J_OPTS" ]; then
+  # Test for files from dev -> packages so this will work as expected in dev if you have packages
+  # installed
+  if [ -e "$base_dir/config/log4j2.yaml" ]; then # Dev environment
+    GATEWAY_CONFIG_DIR="$base_dir/config"
+  elif [ -e "$base_dir/etc/gateway/log4j2.yaml" ]; then # Simple zip file layout
+    GATEWAY_CONFIG_DIR="$base_dir/etc/gateway"
+  elif [ -e "/etc/gateway/log4j2.yaml" ]; then # Normal install layout
+    GATEWAY_CONFIG_DIR="/etc/gateway"
+  fi
+fi
+
+: "${GATEWAY_LOG4J_OPTS:=""}"
+
+# Use file logging by default
+if [ -z "$GATEWAY_LOG4J_OPTS" ]; then
+  export GATEWAY_LOG4J_OPTS="-Dlog4j.configurationFile=file:$GATEWAY_CONFIG_DIR/log4j2.yaml"
+fi
+
+# Set configuration directory
+export GATEWAY_CONFIG_DIR
+
+# Execute the gateway application with the main class
+exec "$base_dir"/bin/gateway-run-class io.confluent.gateway.app.GatewayApplication "$@"
