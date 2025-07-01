@@ -31,10 +31,24 @@
   <properties>
     <component.name>gateway</component.name>
     <io.confluent.gateway.version>1.0.0-0</io.confluent.gateway.version>
+    <jackson.version>2.19.1</jackson.version>
     <docker.file>Dockerfile.ubi9</docker.file>
     <arch>arm64</arch>
   </properties>
-
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
   <build>
     <plugins>
       <plugin>
