@@ -32,6 +32,7 @@
     <component.name>gateway</component.name>
     <io.confluent.gateway.version>1.0.0-0</io.confluent.gateway.version>
     <jackson.version>2.19.1</jackson.version>
+    <slf4j.version>2.0.17</slf4j.version>
     <docker.file>Dockerfile.ubi9</docker.file>
     <arch>arm64</arch>
   </properties>
@@ -56,6 +57,16 @@
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-annotations</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-jdk-platform-logging</artifactId>
+        <version>${slf4j.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
