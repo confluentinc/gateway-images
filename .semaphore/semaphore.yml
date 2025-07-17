@@ -33,12 +33,12 @@ global_job_config:
       - export BRANCH_TAG=$(echo $SEMAPHORE_GIT_BRANCH | tr / -)
       # For PR Builds using Packaging
       - pip install confluent-release-tools
-      - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/$BRANCH_TAG/"
+      - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/"
       - export LATEST_PACKAGING_BUILD_NUMBER=$(aws s3 ls $PACKAGING_BUCKET --no-paginate | grep 'PRE' | awk '{print $NF}' | awk '{print substr($1, 1, length($1)-1)}' | sort -n | tail -n 1)
       # Check if version is complete, otherwise use the previous version
       - export GATEWAY_VERSION=1.0.0
       - export DEFAULT_OS_TYPE="ubi"
-      - export PACKAGES_URL="https://s3-us-west-2.amazonaws.com/dev-gateway-packages-654654529379-us-west-2/$BRANCH_TAG/$LATEST_PACKAGING_BUILD_NUMBER/PACKAGE_TYPE"
+      - export PACKAGES_URL="https://s3-us-west-2.amazonaws.com/dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/$LATEST_PACKAGING_BUILD_NUMBER/PACKAGE_TYPE"
       - 'echo "PACKAGES_URL: ${PACKAGES_URL}"'
       - export PACKAGING_BUILD_NUMBER=$LATEST_PACKAGING_BUILD_NUMBER
       - >-
