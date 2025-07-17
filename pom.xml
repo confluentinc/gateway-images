@@ -40,6 +40,7 @@
           <buildArgs>
             <UBI_MINIMAL_VERSION>${ubi9.minimal.image.version}</UBI_MINIMAL_VERSION>
             <ARCH>${arch}</ARCH>
+            <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
           </buildArgs>
         </configuration>
       </plugin>

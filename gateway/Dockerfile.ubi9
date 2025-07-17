@@ -36,7 +36,7 @@ LABEL io.confluent.docker.git.repo="confluentinc/gateway-images"
 ENV COMPONENT=gateway
 ENV COMPONENT_CONFIG_DIR=/etc/confluent-${COMPONENT}
 
-ARG CONFLUENT_VERSION
+ARG GATEWAY_VERSION
 ARG CONFLUENT_PACKAGES_REPO
 ARG CONFLUENT_PLATFORM_LABEL
 
@@ -51,7 +51,7 @@ baseurl=${CONFLUENT_PACKAGES_REPO}/ \n\
 gpgcheck=1 \n\
 gpgkey=${CONFLUENT_PACKAGES_REPO}/archive.key \n\
 enabled=1 " > /etc/yum.repos.d/confluent.repo \
-    && microdnf install -y confluent-${COMPONENT}-${CONFLUENT_VERSION} \
+    && microdnf install -y confluent-${COMPONENT}-${GATEWAY_VERSION} \
     && echo "===> clean up ..."  \
     && microdnf clean all \
     && rm -rf /tmp/* /etc/yum.repos.d/confluent.repo \

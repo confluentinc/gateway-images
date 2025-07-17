@@ -11,7 +11,7 @@ Please see the CHANGELOG.md for details of recent updates.
 ## Export Environment Variables
 ```bash
 export CONFLUENT_PACKAGES_REPO="https://staging-packages.confluent.io/rpm/8.0"
-export CONFLUENT_VERSION=8.0.0
+export GATEWAY_VERSION=1.0.0
 export DOCKER_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
 export BUILD_NUMBER=$(date +%Y%m%d%H%M%S)
 export GIT_COMMIT=$(git rev-parse HEAD)
