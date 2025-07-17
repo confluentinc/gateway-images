@@ -22,19 +22,15 @@
     <version>[8.0.0-0, 8.0.1-0)</version>
   </parent>
 
-  <groupId>io.confluent.gateway</groupId>
+  <groupId>io.confluent.gateway-images</groupId>
   <artifactId>gateway-images-parent</artifactId>
   <packaging>pom</packaging>
-  <name>Gateway Docker Image</name>
+  <name>Gateway Docker Images</name>
   <description>Build files for Confluent's Gateway Docker Images</description>
   <version>1.0.0-0</version>
-  <properties>
-    <component.name>gateway</component.name>
-    <io.confluent.gateway.version>1.0.0-0</io.confluent.gateway.version>
-    <docker.file>Dockerfile.ubi9</docker.file>
-    <arch>arm64</arch>
-  </properties>
-
+  <modules>
+    <module>gateway</module>
+  </modules>
   <build>
     <plugins>
       <plugin>
@@ -44,9 +40,18 @@
           <buildArgs>
             <UBI_MINIMAL_VERSION>${ubi9.minimal.image.version}</UBI_MINIMAL_VERSION>
             <ARCH>${arch}</ARCH>
+            <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
           </buildArgs>
         </configuration>
       </plugin>
     </plugins>
   </build>
+  <properties>
+    <component.name>gateway</component.name>
+    <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
+    <arch>arm64</arch>
+    <docker.file>Dockerfile.ubi9</docker.file>
+<!--    <jackson.version>2.19.1</jackson.version>-->
+<!--    <slf4j.version>2.0.17</slf4j.version>-->
+  </properties>
 </project>
