@@ -5,11 +5,11 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>io.confluent.gateway</groupId>
+    <groupId>io.confluent.gateway-images</groupId>
     <artifactId>gateway-images-parent</artifactId>
     <version>1.0.0-0</version>
   </parent>
-  <artifactId>gateway</artifactId>
+  <artifactId>cp-gateway</artifactId>
   <name>Gateway Docker Image</name>
   <properties>
     <docker.skip-build>false</docker.skip-build>
