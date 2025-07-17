@@ -22,54 +22,15 @@
     <version>[8.0.0-0, 8.0.1-0)</version>
   </parent>
 
-  <groupId>io.confluent.gateway</groupId>
+  <groupId>io.confluent.gateway-images</groupId>
   <artifactId>gateway-images-parent</artifactId>
   <packaging>pom</packaging>
-  <name>Gateway Docker Image</name>
+  <name>Gateway Docker Images</name>
   <description>Build files for Confluent's Gateway Docker Images</description>
   <version>1.0.0-0</version>
-  <properties>
-    <component.name>gateway</component.name>
-    <io.confluent.gateway.version>1.0.0-0</io.confluent.gateway.version>
-    <jackson.version>2.19.1</jackson.version>
-    <slf4j.version>2.0.17</slf4j.version>
-    <docker.file>Dockerfile.ubi9</docker.file>
-    <arch>arm64</arch>
-  </properties>
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>com.fasterxml.jackson.dataformat</groupId>
-        <artifactId>jackson-dataformat-yaml</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-core</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-databind</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.jackson.core</groupId>
-        <artifactId>jackson-annotations</artifactId>
-        <version>${jackson.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-jdk-platform-logging</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
+  <modules>
+    <module>gateway</module>
+  </modules>
   <build>
     <plugins>
       <plugin>
@@ -84,7 +45,12 @@
       </plugin>
     </plugins>
   </build>
-  <modules>
-    <module>gateway</module>
-  </modules>
+  <properties>
+    <component.name>gateway</component.name>
+    <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
+    <arch>arm64</arch>
+    <docker.file>Dockerfile.ubi9</docker.file>
+<!--    <jackson.version>2.19.1</jackson.version>-->
+<!--    <slf4j.version>2.0.17</slf4j.version>-->
+  </properties>
 </project>

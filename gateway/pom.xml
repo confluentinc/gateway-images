@@ -18,11 +18,6 @@
   </properties>
   <dependencies>
     <dependency>
-      <groupId>io.confluent.gateway</groupId>
-      <artifactId>gateway-app</artifactId>
-      <version>${io.confluent.gateway.version}</version>
-    </dependency>
-    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
@@ -37,53 +32,6 @@
         <executions>
           <execution>
             <phase>none</phase>
-          </execution>
-        </executions>
-      </plugin>
-      <!-- Maven Dependency Plugin -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <version>3.8.1</version>
-        <executions>
-          <execution>
-            <id>copy-dependencies</id>
-            <phase>package</phase>
-            <goals>
-              <goal>copy-dependencies</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/dependency</outputDirectory>
-              <includeScope>runtime</includeScope>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- Maven Assembly Plugin -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <configuration>
-          <descriptors>
-            <descriptor>src/assembly/development.xml</descriptor>
-            <descriptor>src/assembly/package.xml</descriptor>
-            <descriptor>src/assembly/standalone.xml</descriptor>
-          </descriptors>
-          <archive>
-            <manifest>
-              <mainClass>${main-class}</mainClass>
-            </manifest>
-          </archive>
-          <attach>false</attach>
-        </configuration>
-        <executions>
-          <execution>
-            <id>make-assembly</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
           </execution>
         </executions>
       </plugin>
