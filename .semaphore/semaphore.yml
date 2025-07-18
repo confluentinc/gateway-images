@@ -36,7 +36,8 @@ global_job_config:
       - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/"
       - export LATEST_PACKAGING_BUILD_NUMBER=$(aws s3 ls $PACKAGING_BUCKET --no-paginate | grep 'PRE' | awk '{print $NF}' | awk '{print substr($1, 1, length($1)-1)}' | sort -n | tail -n 1)
       # fail if LATEST_PACKAGING_BUILD_NUMBER is empty
-      - if [[ -z "$LATEST_PACKAGING_BUILD_NUMBER" ]]; then
+      - >-
+        if [[ -z "$LATEST_PACKAGING_BUILD_NUMBER" ]]; then
           echo "No packaging build found for branch $BRANCH_TAG"
           exit 1
         fi
