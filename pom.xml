@@ -51,7 +51,5 @@
     <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
     <arch>arm64</arch>
     <docker.file>Dockerfile.ubi9</docker.file>
-<!--    <jackson.version>2.19.1</jackson.version>-->
-<!--    <slf4j.version>2.0.17</slf4j.version>-->
   </properties>
 </project>
