@@ -30,22 +30,4 @@ if [ -f "${GATEWAY_CONFIG_FILE}.template" ]; then
   dub template "${GATEWAY_CONFIG_FILE}.template" "$GATEWAY_CONFIG_FILE"
 fi
 
-# Set up classpath - use gateway-docker path as that's where dependencies are placed
-GATEWAY_CLASSPATH="/usr/share/java/gateway/*"
-
-# Prepare JVM arguments
-JVM_ARGS="$GATEWAY_JVM_OPTS"
-
-# Add logging configuration if available
-if [ -f "/etc/gateway/log4j2.yaml" ]; then
-  JVM_ARGS="$JVM_ARGS -Dlog4j2.configurationFile=/etc/gateway/log4j2.yaml"
-fi
-
-echo "===> Launching Gateway..."
-echo "Configuration file: $GATEWAY_CONFIG_FILE"
-echo "JVM Args: $JVM_ARGS"
-
-exec java $JVM_ARGS \
-  -cp "$GATEWAY_CLASSPATH" \
-  io.confluent.gateway.app.GatewayApplication \
-  --config "$GATEWAY_CONFIG_FILE"
+/usr/bin/gateway-start -c $GATEWAY_CONFIG_FILE "$@"
