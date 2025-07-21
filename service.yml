@@ -8,9 +8,8 @@ codeowners:
 semaphore:
   enable: true
   pipeline_type: cp-dockerfile
-  docker_repos: ["confluentinc/gateway",]
-  community_docker_repos: []
-  community_maven_modules: []
+  pipeline_enable: false
+  docker_repos: ["confluentinc/cp-gateway",]
   maven_phase: 'package'
   maven_skip_deploy: true
   build_arm: true
@@ -39,16 +38,6 @@ semaphore:
           options:
             - 'True'
             - 'False'
-        - name: CONFLUENT_DEB_VERSION
-          required: true
-          default_value: '1'
-        - name: SKIP_COMMUNITY
-          required: false
-          default_value: 'False'
-          description: 'Skip building community docker images'
-          options:
-            - 'True'
-            - 'False'
     - name: cp-dockerfile-promote
       branch: master
       pipeline_file: .semaphore/cp_dockerfile_promote.yml
@@ -65,15 +54,7 @@ semaphore:
         - name: PROMOTE_OS_TYPE
           required: true
           options:
-            - 'deb'
             - 'ubi'
-        - name: SKIP_COMMUNITY
-          required: false
-          default_value: 'False'
-          description: 'Skip publishing community docker images'
-          options:
-            - 'True'
-            - 'False'
 code_artifact:
   enable: true
   package_paths:
