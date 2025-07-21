@@ -1,4 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <!--~
+  ~ Copyright 2025 Confluent Inc.
+  ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
   ~ You may obtain a copy of the License at
@@ -12,44 +15,71 @@
   ~ limitations under the License.
   ~-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>io.confluent</groupId>
-    <artifactId>common-docker</artifactId>
-    <version>[8.0.0-0, 8.0.1-0)</version>
-  </parent>
+    <parent>
+        <groupId>io.confluent</groupId>
+        <artifactId>common-docker</artifactId>
+        <version>[8.0.0-0, 8.0.1-0)</version>
+    </parent>
 
-  <groupId>io.confluent.gateway-images</groupId>
-  <artifactId>gateway-images-parent</artifactId>
-  <packaging>pom</packaging>
-  <name>Gateway Docker Images</name>
-  <description>Build files for Confluent's Gateway Docker Images</description>
-  <version>1.0.0-0</version>
-  <modules>
-    <module>gateway</module>
-  </modules>
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>com.spotify</groupId>
-        <artifactId>dockerfile-maven-plugin</artifactId>
-        <configuration>
-          <buildArgs>
-            <UBI_MINIMAL_VERSION>${ubi9.minimal.image.version}</UBI_MINIMAL_VERSION>
-            <ARCH>${arch}</ARCH>
-            <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
-          </buildArgs>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
-  <properties>
-    <component.name>gateway</component.name>
-    <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
-    <arch>arm64</arch>
-    <docker.file>Dockerfile.ubi9</docker.file>
-  </properties>
+    <groupId>io.confluent.gateway-images</groupId>
+    <artifactId>gateway-images-parent</artifactId>
+    <packaging>pom</packaging>
+    <name>Gateway Docker Images</name>
+    <description>Build files for Confluent's Gateway Docker Images</description>
+    <version>1.0.0-0</version>
+
+    <modules>
+        <module>gateway</module>
+    </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.spotify</groupId>
+                <artifactId>dockerfile-maven-plugin</artifactId>
+                <configuration>
+                    <buildArgs>
+                        <UBI_MINIMAL_VERSION>${docker.build.ubi9.minimal.version}</UBI_MINIMAL_VERSION>
+                        <ARCH>${docker.build.arch}</ARCH>
+                        <GATEWAY_VERSION>${docker.build.gateway.version}</GATEWAY_VERSION>
+                    </buildArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>io.fabric8</groupId>
+                <artifactId>docker-maven-plugin</artifactId>
+                <configuration>
+                    <images>
+                        <image>
+                            <build>
+                                <args>
+                                    <UBI_MINIMAL_VERSION>${docker.build.ubi9.minimal.version}</UBI_MINIMAL_VERSION>
+                                    <ARCH>${docker.build.arch}</ARCH>
+                                    <GATEWAY_VERSION>${docker.build.gateway.version}</GATEWAY_VERSION>
+                                </args>
+                            </build>
+                        </image>
+                    </images>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <properties>
+        <component.name>gateway</component.name>
+        <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
+        <arch.type>.arm64</arch.type>
+        <!--  This is a placeholder for the architecture of the image that we will need from input
+         and the input will come in mvn command from semaphore.yml file -->
+        <docker.file>Dockerfile.ubi9</docker.file>
+        
+        <!-- Shared Docker build arguments -->
+        <docker.build.ubi9.minimal.version>${ubi9.minimal.image.version}</docker.build.ubi9.minimal.version>
+        <docker.build.arch>${arch.type}</docker.build.arch>
+        <docker.build.gateway.version>${GATEWAY_VERSION}</docker.build.gateway.version>
+    </properties>
 </project>
