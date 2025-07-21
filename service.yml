@@ -9,7 +9,7 @@ semaphore:
   enable: true
   pipeline_type: cp-dockerfile
   pipeline_enable: false
-  docker_repos: ["confluentinc/gateway",]
+  docker_repos: ["confluentinc/cp-gateway",]
   maven_phase: 'package'
   maven_skip_deploy: true
   build_arm: true
