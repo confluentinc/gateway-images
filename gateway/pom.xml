@@ -9,7 +9,7 @@
     <artifactId>gateway-images-parent</artifactId>
     <version>1.0.0-0</version>
   </parent>
-  <artifactId>cp-gateway</artifactId>
+  <artifactId>gateway</artifactId>
   <name>Gateway Docker Image</name>
   <properties>
     <docker.skip-build>false</docker.skip-build>
