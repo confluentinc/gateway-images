@@ -237,19 +237,15 @@ blocks:
             - export LATEST_PUSH_TAG=$LATEST_TAG$OS_TAG$ARM_ARCH
             - docker tag $DEV_IMAGE_FULL $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
             - docker push $PROD_IMAGE_NAME:$LATEST_PUSH_TAG
-  - name: Create Manifest and Maven Deploy
+  - name: Create Manifest
     dependencies: ["Deploy AMD confluentinc/gateway", "Deploy ARM confluentinc/gateway"]
     run:
       when: "branch = 'master' or branch =~ '^[0-9]+\\.[0-9]+\\.x$' or branch =~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-cp[0-9]+)?(-rc[0-9]+)?$'"
     task:
       jobs:
-        - name: Create Manifest and Maven Deploy
+        - name: Create Manifest
           commands:
             - export DOCKER_PROD_IMAGE_NAME=$DOCKER_PROD_REGISTRY${DOCKER_REPOS// / $DOCKER_PROD_REGISTRY}
-            - |-
-              if [[ ! $IS_RELEASE && ! $IS_PREVIEW ]]; then
-                echo "maven deploy command"
-              fi
             # Create manifest
             - >-
               for image in $DOCKER_PROD_IMAGE_NAME;
@@ -274,7 +270,7 @@ blocks:
               done
   - name: Push docker images tags summary to artifacts
     dependencies:
-      - Create Manifest and Maven Deploy
+      - Create Manifest
     run:
       when: "branch = 'master' or branch =~ '^[0-9]+\\.[0-9]+\\.x$' or branch =~ '^[0-9]+\\.[0-9]+\\.[0-9]+(-cp[0-9]+)?(-rc[0-9]+)?$'"
     task:
