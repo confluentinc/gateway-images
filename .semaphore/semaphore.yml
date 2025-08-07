@@ -32,7 +32,7 @@ global_job_config:
       - export BUILD_NUMBER=$(echo $SEMAPHORE_WORKFLOW_ID | cut -f1 -d"-")
       - export BRANCH_TAG=$(echo $SEMAPHORE_GIT_BRANCH | tr / -)
       # For PR Builds using Packaging
-      - pip install confluent-release-tools
+      - pip install confluent-devtools
       - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/"
       - export LATEST_PACKAGING_BUILD_NUMBER=latest # use packages in latest directory of corresponding nightly branch
       - export GATEWAY_VERSION="1.0.0" #hardcoded for now
