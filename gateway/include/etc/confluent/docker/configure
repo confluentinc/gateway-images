@@ -16,10 +16,7 @@
 
 . /etc/confluent/docker/bash-config
 
-# Ensure required environment variables are set
-dub ensure-atleast-one GATEWAY_CONFIG GATEWAY_CONFIG_FILE
-
-dub path /etc/"${COMPONENT}"/ writable
+ub path /etc/"${COMPONENT}"/ writable
 
 # GATEWAY_CONFIG if present, put it /etc/${COMPONENT}/gateway-config.yaml and set GATEWAY_CONFIG_FILE
 if [[ -n "${GATEWAY_CONFIG-}" ]]; then
@@ -27,5 +24,12 @@ if [[ -n "${GATEWAY_CONFIG-}" ]]; then
   export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
   echo "${GATEWAY_CONFIG}" > "${GATEWAY_CONFIG_FILE}"
 else
-  echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
+  if [[ -n "${GATEWAY_CONFIG_TEMPLATE-}" && -f "${GATEWAY_CONFIG_TEMPLATE}" ]]; then
+    echo "===> Templating configuration file from GATEWAY_CONFIG_TEMPLATE"
+    export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+    ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
+  else
+    echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
 fi
+
+ub render-template "/etc/confluent/docker/log4j2.yaml.template" > "/etc/${COMPONENT}/log4j2.yaml"
