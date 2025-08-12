@@ -30,6 +30,5 @@ else
     ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
   else
     echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
+  fi
 fi
-
-ub render-template "/etc/confluent/docker/log4j2.yaml.template" > "/etc/${COMPONENT}/log4j2.yaml"

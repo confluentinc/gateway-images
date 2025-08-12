@@ -1,7 +1,7 @@
 services:
     gateway:
         hostname: gateway
-        image: ${DOCKER_IMAGE}
+        image: ${GATEWAY_DOCKER_IMAGE}
         environment:
           GATEWAY_CONFIG: |
             gateway:
