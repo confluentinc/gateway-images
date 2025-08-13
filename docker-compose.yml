@@ -2,6 +2,12 @@ services:
     gateway:
         hostname: gateway
         image: ${GATEWAY_DOCKER_IMAGE}
+        ports:
+            - "9192:9192"
+            - "9193:9193"
+            - "9194:9194"
+            - "9195:9195"
+            - "19095:19095"  # Admin port
         environment:
           GATEWAY_CONFIG: |
             gateway:
