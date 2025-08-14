@@ -11,6 +11,9 @@ services:
       - "9093:9093"
     volumes:
       - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+      - ./client.properties:/etc/kafka/client.properties
+      - ./ssl/client.truststore.jks:/etc/kafka/client.truststore.jks
+      - ./ssl/client.keystore.jks:/etc/kafka/client.keystore.jks
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -42,11 +45,18 @@ services:
     image: 519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/confluentinc/gateway:master-latest-ubi9
     container_name: gateway
     networks:
-      - confluent-local-network
+      confluent-local-network:
+        aliases:
+          - broker1.host.docker.internal
     depends_on:
       - kafka-1
     volumes:
-      - /Users/prabhamanepalli/cpc/gateway-images/examples/simple-passthrough-example/gateway.yaml:/etc/gateway/config.yaml
+      - ./gateway.yaml:/etc/gateway/config.yaml
+      - ./ssl/gateway.truststore.jks:/etc/gateway/gateway.truststore.jks
+      - ./ssl/gateway.truststore.pwd:/etc/gateway/gateway.truststore.pwd
+      - ./ssl/gateway.keystore.jks:/etc/gateway/gateway.keystore.jks
+      - ./ssl/gateway.keystore.pwd:/etc/gateway/gateway.keystore.pwd
+      - ./ssl/gateway.key.pwd:/etc/gateway/gateway.key.pwd
     environment:
       GATEWAY_CONFIG_FILE: /etc/gateway/config.yaml
     ports:

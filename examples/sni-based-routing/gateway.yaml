@@ -7,20 +7,29 @@ gateway:
       type: kafka
       kafkaCluster:
         name: kafka-cluster-1
-        nodeIdRanges:
-          - name: d
-            start: 1 # 19093, 1
-            end: 5
         bootstrapServers:
           - id: localkafka
             endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
   routes:
-    - name: passthrough
+    - name: sni-route
       endpoint: "host.docker.internal:19092"
       brokerIdentificationStrategy:
-        type: port # nodeId starts from 19093 and for nodes starting from 1 to 5
+        type: host
+        pattern: "broker$(nodeId).host.docker.internal"
       streamingDomain:
         name: sample-domain
         bootstrapServerId: localkafka
       security:
         auth: passthrough
+        ssl:
+          truststore:
+            location: /etc/gateway/gateway.truststore.jks
+            password:
+              file: /etc/gateway/gateway.truststore.pwd
+          keystore:
+            location: /etc/gateway/gateway.keystore.jks
+            password:
+              file: /etc/gateway/gateway.keystore.pwd
+            keyPassword:
+              file: /etc/gateway/gateway.key.pwd
+          clientAuth: required
