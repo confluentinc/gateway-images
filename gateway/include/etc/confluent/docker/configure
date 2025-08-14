@@ -32,7 +32,3 @@ else
     echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
   fi
 fi
-
-if [ -z "$GATEWAY_CONFIG_FILE" ]; then
-  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
-fi

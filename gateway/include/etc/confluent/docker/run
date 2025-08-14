@@ -19,4 +19,9 @@ echo "===> Configuring Gateway..."
 # Run the configure script to validate environment
 /etc/confluent/docker/configure
 
+# exporting during configure does not persist, so we need to set it again
+if [ -z "$GATEWAY_CONFIG_FILE" ]; then
+  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+fi
+
 /usr/bin/gateway-start -c $GATEWAY_CONFIG_FILE "$@"
