@@ -14,7 +14,25 @@
 # limitations under the License.
 #
 
-# Ensure required environment variables are set
-dub ensure GATEWAY_NAME
+. /etc/confluent/docker/bash-config
 
-echo "Gateway configuration validated successfully"
+ub path /etc/"${COMPONENT}"/ writable
+
+# GATEWAY_CONFIG if present, put it /etc/${COMPONENT}/gateway-config.yaml and set GATEWAY_CONFIG_FILE
+if [[ -n "${GATEWAY_CONFIG-}" ]]; then
+  echo "===> Using GATEWAY_CONFIG environment variable"
+  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+  echo "${GATEWAY_CONFIG}" > "${GATEWAY_CONFIG_FILE}"
+else
+  if [[ -n "${GATEWAY_CONFIG_TEMPLATE-}" && -f "${GATEWAY_CONFIG_TEMPLATE}" ]]; then
+    echo "===> Templating configuration file from GATEWAY_CONFIG_TEMPLATE"
+    export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+    ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
+  else
+    echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
+  fi
+fi
+
+if [ -z "$GATEWAY_CONFIG_FILE" ]; then
+  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+fi

@@ -17,17 +17,6 @@
 echo "===> Configuring Gateway..."
 
 # Run the configure script to validate environment
-/usr/bin/docker/configure
-
-# Set default config file if not specified
-if [ -z "$GATEWAY_CONFIG_FILE" ]; then
-  export GATEWAY_CONFIG_FILE="/etc/gateway/gateway-config.yaml"
-fi
-
-# Template the configuration file if template exists
-if [ -f "${GATEWAY_CONFIG_FILE}.template" ]; then
-  echo "===> Templating configuration file..."
-  dub template "${GATEWAY_CONFIG_FILE}.template" "$GATEWAY_CONFIG_FILE"
-fi
+/etc/confluent/docker/configure
 
 /usr/bin/gateway-start -c $GATEWAY_CONFIG_FILE "$@"
