@@ -6,11 +6,11 @@ services:
     networks:
       - confluent-local-network
     ports:
-      - "33333:33333" # Port for clients outside Docker (e.g., from your host machine)
+      - "33333:33333" 
       - "44444:44444"
       - "9093:9093"
     volumes:
-      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+      - ${KAFKA_SERVER_JAAS_CONF}:/etc/kafka/kafka_server_jaas.conf
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -39,16 +39,41 @@ services:
 
 
   gateway:
-    image: 519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/confluentinc/gateway:master-latest-ubi9
+    image: "${GATEWAY_IMAGE}"
     container_name: gateway
     networks:
       - confluent-local-network
     depends_on:
       - kafka-1
-    volumes:
-      - /Users/prabhamanepalli/cpc/gateway-images/examples/simple-passthrough-example/gateway.yaml:/etc/gateway/config.yaml
     environment:
-      GATEWAY_CONFIG_FILE: /etc/gateway/config.yaml
+      GATEWAY_CONFIG: | 
+        gateway:
+          admin:
+            endpoints:
+              metrics: true
+          streamingDomains:
+            - name: sample-domain
+              type: kafka
+              kafkaCluster:
+                name: kafka-cluster-1
+                nodeIdRanges:
+                  - name: d
+                    start: 1 # 19093, 1
+                    end: 5
+                bootstrapServers:
+                  - id: localkafka
+                    endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
+          routes:
+            - name: passthrough
+              endpoint: "host.docker.internal:19092"
+              brokerIdentificationStrategy:
+                type: port # nodeId starts from 19093 and for nodes starting from 1 to 5
+              streamingDomain:
+                name: sample-domain
+                bootstrapServerId: localkafka
+              security:
+                auth: passthrough
+
     ports:
       - "19092:19092"
       - "19093:19093"
@@ -60,7 +85,6 @@ services:
         exec /etc/confluent/docker/run
       "
 
-# Define the shared network that all services will use
 networks:
   confluent-local-network:
     driver: bridge
