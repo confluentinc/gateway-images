@@ -1,16 +1,15 @@
 services:
 
+# Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller. 
   kafka-1:
     image: confluentinc/cp-server:latest
     container_name: kafka-1
-    networks:
-      - confluent-local-network
     ports:
-      - "33333:33333" 
-      - "44444:44444"
-      - "9093:9093"
+      - "33333:33333"  # External listener port (for clients outside Docker)
+      - "44444:44444"  # Internal listener port (for internal communication)
+      - "9093:9093"    # Controller port (for controller communication)
     volumes:
-      - ${KAFKA_SERVER_JAAS_CONF}:/etc/kafka/kafka_server_jaas.conf
+      - ${KAFKA_SERVER_JAAS_CONF}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -37,12 +36,12 @@ services:
       KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
-
+ #Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
+ # kakfa-1 is onboarded with the Gateway with streaming domain sample-domain on internal-kafka-listener.
+ # Passthrough route on Gateway is created to connect to the kafka-1 broker on Gateway port 19092. Name of the route is passthrough-route.
   gateway:
     image: "${GATEWAY_IMAGE}"
     container_name: gateway
-    networks:
-      - confluent-local-network
     depends_on:
       - kafka-1
     environment:
@@ -52,29 +51,29 @@ services:
             endpoints:
               metrics: true
           streamingDomains:
-            - name: sample-domain
+            - name: sample-domain  
               type: kafka
               kafkaCluster:
-                name: kafka-cluster-1
+                name: kafka-cluster-1 
                 nodeIdRanges:
                   - name: d
-                    start: 1 # 19093, 1
+                    start: 1 
                     end: 5
                 bootstrapServers:
-                  - id: localkafka
-                    endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
+                  - id: internal-kafka-listener  
+                    endpoint: "kafka-1:44444" 
           routes:
-            - name: passthrough
-              endpoint: "host.docker.internal:19092"
+            - name: passthrough-route
+              endpoint: "host.docker.internal:19092" 
               brokerIdentificationStrategy:
-                type: port # nodeId starts from 19093 and for nodes starting from 1 to 5
+                type: port 
               streamingDomain:
                 name: sample-domain
-                bootstrapServerId: localkafka
+                bootstrapServerId: internal-kafka-listener 
               security:
-                auth: passthrough
+                auth: passthrough 
 
-    ports:
+    ports: #mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests. 
       - "19092:19092"
       - "19093:19093"
       - "19094:19094"
@@ -85,6 +84,3 @@ services:
         exec /etc/confluent/docker/run
       "
 
-networks:
-  confluent-local-network:
-    driver: bridge
