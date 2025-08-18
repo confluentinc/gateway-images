@@ -1,0 +1,41 @@
+services:
+    gateway:
+        hostname: gateway
+        image: ${GATEWAY_DOCKER_IMAGE}
+        ports:
+            - "9192:9192"
+            - "9193:9193"
+            - "9194:9194"
+            - "9195:9195"
+            - "19095:19095"  # Admin port
+        environment:
+          GATEWAY_CONFIG: |
+            gateway:
+              name: "sample-gateway"
+              streamingDomains:
+                - name: "sample-domain"
+                  kafkaCluster:
+                    name: "sample-cluster"
+                    bootstrapServers:
+                      - endpoint: localhost:9092
+                        id: plaintext
+                    nodeIdRanges:
+                      - name: "default"
+                        start: 0
+                        end: 2
+              routes:
+                - name: "sample-route"
+                  endpoint: "localhost:9192"
+                  brokerIdentificationStrategy:
+                    type: port
+                  streamingDomain:
+                    name: "sample-domain"
+                    bootstrapServerId: "plaintext"
+                  security:
+                    auth: "passthrough"
+              admin:
+                port: 19095
+                endpoints:
+                  metrics: true
+              advanced:
+                useIoUring: false
