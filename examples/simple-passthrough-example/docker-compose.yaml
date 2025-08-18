@@ -38,7 +38,9 @@ services:
 
  #Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
  # kakfa-1 is onboarded with the Gateway with streaming domain sample-domain on internal-kafka-listener.
+ # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
  # Passthrough route on Gateway is created to connect to the kafka-1 broker on Gateway port 19092. Name of the route is passthrough-route.
+
   gateway:
     image: "${GATEWAY_IMAGE}"
     container_name: gateway
