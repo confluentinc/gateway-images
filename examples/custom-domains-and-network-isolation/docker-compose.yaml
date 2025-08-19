@@ -4,8 +4,11 @@ services:
   kafka-1:
     image: confluentinc/cp-server:latest
     container_name: kafka-1
+    # network for kafka-1 container
+    networks:
+      - kafka-net
     ports:
-      - "33333:33333"  # External listener port (for clients outside Docker)
+      - "33333:33333"  # External listener port (for clients outside Docker. For ex, Gateway will connect to this port considering its in a different network)
       - "44444:44444"  # Internal listener port (for internal communication)
       - "9093:9093"    # Controller port (for controller communication)
     volumes:
@@ -17,18 +20,17 @@ services:
       CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT'
       KAFKA_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://0.0.0.0:33333, CONTROLLER://kafka-1:9093'
-      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://localhost:33333'
+      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://host.docker.internal:33333'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
       KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf'
-
+      
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-  
 
       KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
@@ -37,46 +39,52 @@ services:
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
  # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
- # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
- # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
- # Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
+ # kafka-1 is onboarded with the Gateway with streaming domain sample-domain. Gateway connects to this sample streaming domain using external-listener-endpoint as the bootstrap server endpoint.
+ # partner-access-route route on Gateway is created for external clients to connect to the kafka-1 broker via the Gateway. Name of the route is partner-access-route. 
+ # partner-access-route is associated with sample-domain. All the traffic addressed by partner-access-route will be forwarded to the sample-domain by the Gateway.
+ # Passthrough authentication is enabled at Gateway for partner-access-route. When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
+ # Two seperate networks are defined for kafka and gateway. Kafka brokers are isolated in a private docker network. 
+ # partner-access-route route is created with a custom domain name "my-custom-domain-name" and port 19092. This route is used by external clients to connect to the kafka-1 broker via the Gateway. Setting this custom domain name rather than using localhost requires setting up the host resolution in /etc/hosts file.
+ # Port based routing is used for this route for simplicity of local experience. 
 
   gateway:
     image: "${GATEWAY_IMAGE}"
     container_name: gateway
+    # A separate network for the gateway container
+    networks:
+      - gateway-net
     depends_on:
       - kafka-1
     environment:
-      GATEWAY_CONFIG: | 
+      GATEWAY_CONFIG: |
         gateway:
           admin:
             endpoints:
               metrics: true
           streamingDomains:
-            - name: sample-domain  
+            - name: sample-domain
               type: kafka
               kafkaCluster:
-                name: kafka-cluster-1 
+                name: kafka-cluster-1
                 nodeIdRanges:
                   - name: d
-                    start: 1 
+                    start: 1 # 19093, 1
                     end: 5
                 bootstrapServers:
-                  - id: internal-kafka-listener  
-                    endpoint: "kafka-1:44444" 
+                  - id: external-listener-endpoint 
+                    endpoint: "host.docker.internal:33333"  
           routes:
-            - name: passthrough-route
-              endpoint: "host.docker.internal:19092" 
+            - name: partner-access-route
+              endpoint: "my-custom-domain-name:19092"
               brokerIdentificationStrategy:
                 type: port 
               streamingDomain:
                 name: sample-domain
-                bootstrapServerId: internal-kafka-listener 
+                bootstrapServerId: external-listener-endpoint
               security:
-                auth: passthrough 
-
-    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests.
-      - "19092:19092"
+                auth: passthrough
+    ports:
+      - "19092:19092" # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests. 
       - "19093:19093"
       - "19094:19094"
       - "9190:9190"
@@ -85,4 +93,9 @@ services:
         chmod +x /etc/confluent/docker/run 2>/dev/null || true
         exec /etc/confluent/docker/run
       "
-
+# Define two separate networks one for kafka and one for gateway
+networks:
+  kafka-net:
+    driver: bridge
+  gateway-net:
+    driver: bridge
