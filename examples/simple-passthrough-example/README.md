@@ -100,8 +100,6 @@ Command to run the consumer
 ```
 
 ### Stop / Clean
-
-
 ```bash
 docker compose down -v
 ```
