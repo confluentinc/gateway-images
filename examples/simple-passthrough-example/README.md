@@ -2,13 +2,13 @@
 
 This section has a docker setup to bring up Gateway and broker containers with Identity Passthrough at Gateway. Each CPC Gateway Route can be configured with Identity Passthrough or Authentication Swapping security mechanims. This example section helps to quickly bring up the Identity Passthrough locally.
 
-When Identity Passtrhough is enabled at CPC Gateway for a Route, Gateway forwards the authentication requests to brokers and it does not authenticate the incoming client.  When Authentication Swapping is enabled for a Route, both Gateway and brokers perform the authentication and Gateway could swap the principal/credentials of incoming clients before forward the request to brokers.
+When Identity Passthrough is enabled at CPC Gateway for a Route, Gateway forwards the authentication requests to brokers and it does not authenticate the incoming client.  When Authentication Swapping is enabled for a Route, both Gateway and brokers perform the authentication and Gateway could swap the principal/credentials of incoming clients before forwarding the request to brokers.
 
 Identity Passthrough can be enabled for SASL authentications but not for mTLS authentication of clients<>brokers because of TLS termination and re-initiation at the Gateway.
 
 ## Gateway Configuration Example
 
-Below example has Gateway configuration. It creates a Route with name "passthrough-route" and Streaming Domain with name "sample-domain". "passthrough-route" is associates with "sample-domain". All the traffic addressed by Gateway's passthrough-route will be forwarded to the "sample-domain". Sample domain is a logical abstraction of Kafka cluster with listener endpoint running at kafka-1:44444. This example uses Port based routing for simplicity of local experience.  Docker compose file uses the below configuration to bring up the Gateway container. 
+Below example has Gateway configuration. It creates a Route with name "passthrough-route" and Streaming Domain with name "sample-domain". "passthrough-route" is associated with "sample-domain". All the traffic addressed by Gateway's passthrough-route will be forwarded to the "sample-domain". Sample domain is a logical abstraction of Kafka cluster with listener endpoint running at kafka-1:44444. This example uses Port based routing for simplicity of local experience.  Docker compose file uses the below configuration to bring up the Gateway container. 
 
 ```yaml
 GATEWAY_CONFIG: | 
