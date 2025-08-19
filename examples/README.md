@@ -22,7 +22,6 @@ Confluent Private Cloud Gateway introduces new routing constructs called ***Rout
 
 ### Route
 - A Gateway endpoint where client applications connect to stream data.
-Gateway endpoint where client applications connect to stream data.
 
 ### Streaming Domain 
 - Logical representation of your Kafka clusters at the Gateway.
