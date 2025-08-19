@@ -1,7 +1,8 @@
 # gateway-images
 
-This repository is part of the Confluent organization on GitHub.
-It is public and open to contributions from the community.
+This repository hosts the docker image source files for Confluent Private Cloud Gateway. Please checkout the examples section more details on Confluent Private Cloud Gateway and how to get started with it.
+
+It is part of the Confluent organization on GitHub. It is public and open to contributions from the community.
 
 Please see the LICENSE file for contribution terms.
 Please see the CHANGELOG.md for details of recent updates.
