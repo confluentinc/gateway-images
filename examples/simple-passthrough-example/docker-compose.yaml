@@ -36,8 +36,8 @@ services:
       KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
- #Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
- # kakfa-1 is onboarded with the Gateway with streaming domain sample-domain on internal-kafka-listener.
+ # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
+ # kafka-1 is onboarded with the Gateway with streaming domain sample-domain on internal-kafka-listener.
  # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
  # Passthrough route on Gateway is created to connect to the kafka-1 broker on Gateway port 19092. Name of the route is passthrough-route.
 
@@ -75,7 +75,7 @@ services:
               security:
                 auth: passthrough 
 
-    ports: #mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests. 
+    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests.
       - "19092:19092"
       - "19093:19093"
       - "19094:19094"
