@@ -239,7 +239,7 @@ __Not Supported__
 ```yaml
   - name: azure-keyvault
     provider:
-      type: "Azure"
+      type: AZURE
       config:
         vaultUrl: https://authswap.vault.azure.net/
         credentialType: UsernamePassword
@@ -274,7 +274,7 @@ __Not Supported__
 ```yaml
   - name: azure-keyvault
     provider:
-      type: "Azure"
+      type: AZURE
       config:
         vaultUrl: https://authswap.vault.azure.net/
         credentialType: ClientCertificate
@@ -284,5 +284,5 @@ __Not Supported__
         certificatePath: /opt/ssl/client-cert.pfx
         certificatePfxPassword: <pfx-password>
         prefixPath: "" # optional, defaults to empty
-        separator: ":" # optional, defaults to ":" 
+        separator: ":" # optional, defaults to ":"
 ```
