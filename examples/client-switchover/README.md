@@ -2,9 +2,9 @@
 
 - Client Switchover feature of CPC Gateway helps to enable migrations from a source cluster to destination cluster. For example, once on-premise clients are onboarded to CPC Gateway, you can migrate them to Confluent Cloud without client side changes. Gateway can take care of authentication translation as per destination cluster with auth swapping feature.
 
-- Client Switchover can also be used to enable Disastor Recovery Switch from unhealthy cluster to a healthy cluster. It helps in significantly reducing the RTO by avoiding client side changes during a DR scenario. 
+- Client Switchover can also be used to enable Disaster Recovery Switch from unhealthy cluster to a healthy cluster. It helps in significantly reducing the RTO by avoiding client side changes during a DR scenario. 
 
-- Client Switchover can also easies the on-premise broker upgrades by enabling Blue-Green upgrade strategies.
+- Client Switchover can also ease the on-premise broker upgrades by enabling Blue-Green upgrade strategies.
 
 - Data replication has to be setup outside of CPC Gateway as per your requirements using tools like Cluster Linking.
 
@@ -120,7 +120,7 @@ Following are the commands to create a topic, produce and consume to the passthr
 ```
  ./kafka-topics --bootstrap-server localhost:19092 --create --topic "test-topic" --command-config client_sasl.properties
 ```
-To experience client traffic switching to second cluster without client side changes, start the producer in a loop to continously stream to the Gateway
+To experience client traffic switching to second cluster without client side changes, start the producer in a loop to continuously stream to the Gateway
 
 
 **Run the producer**

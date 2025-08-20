@@ -36,7 +36,7 @@ services:
       KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
-# Second Kafka clsuter
+# Second Kafka cluster
   kafka-2:
     image: confluentinc/cp-server:latest
     container_name: kafka-2
