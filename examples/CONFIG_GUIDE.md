@@ -28,9 +28,9 @@ streamingDomains:
       name: sales-cluster # default: <streamingDomain.name>
       bootstrapServers:
         - id: PLAINTEXT-1
-          endpoint: PLAINTEXT://kafka0.example.com:9092
+          endpoint: kafka0.example.com:9092
         - id: SASL_SSL-1
-          endpoint: SASL_SSL://kafka0.example.com:9093
+          endpoint: kafka0.example.com:9093
           ssl:  # required when using SASL_SSL/SSL
             ignoreTrust: false
             truststore:
