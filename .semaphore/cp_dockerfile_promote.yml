@@ -25,126 +25,119 @@ global_job_config:
     commands:
       - checkout
       - . vault-setup
-      # Semaphore does not accept empty values for parameters.
-      - if [[ -z "$GATEWAY_VERSION" ]]; then echo "Must specify GATEWAY_VERSION" && exit 1; fi
-      - if [[ -z "$IMAGE_REVISION" ]]; then echo "Must specify IMAGE_REVISION" && exit 1; fi
-      - if [[ -z "$PROMOTE_OS_TYPE" ]]; then echo "Must specify PROMOTE_OS_TYPE" && exit 1; fi
-      - >-
-        echo """
-        Parameters:
-        ==========================
-        GATEWAY_VERSION: $GATEWAY_VERSION
-        IMAGE_REVISION: $IMAGE_REVISION
-        UPDATE_LATEST_TAG: $UPDATE_LATEST_TAG
-        PACKAGING_BUILD_NUMBER: $PACKAGING_BUILD_NUMBER
-        PROMOTE_OS_TYPE: $PROMOTE_OS_TYPE
-        """
-      - export BRANCH_TAG=$(echo $SEMAPHORE_GIT_BRANCH | tr / -)
+      # ECR to DockerHub promotion configuration
+      # SOURCE: ECR registry containing the built images
+      # DESTINATION: DockerHub public registry for distribution
       - export DOCKER_PROD_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/"
-      - export PROMOTED_TAG_PREFIX="$GATEWAY_VERSION-$IMAGE_REVISION"
-      - if [[ ! "$PACKAGING_BUILD_NUMBER" ]]; then export $PACKAGING_BUILD_NUMBER="latest"; fi
-      - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY
-      - export AMD_ARCH=.amd64
-      - export ARM_ARCH=.arm64
+      - export SOURCE_REPO="confluentinc/gateway"              # ECR source repository
+      - export DEST_REPO="confluentinc/cpc-gateway"            # DockerHub destination repository
+      - export SOURCE_TAG="master-45-ubi9"                     # Specific image tag to promote
+      - export TARGET_VERSION="1.0.0-early-access"            # Target version tag for promotion
+      - echo "Promoting $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_TAG to $DEST_REPO:$TARGET_VERSION and latest"
+      - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY  # Login to DockerHub
+      - export AMD_ARCH="-amd64"                               # AMD64 architecture suffix
+      - export ARM_ARCH="-arm64"                               # ARM64 architecture suffix
 
 blocks:
+  # STAGE 1: Promote AMD64 architecture images
+  # This job handles the AMD64 version of the gateway image
   - name: Promote AMD
     dependencies: []
     task:
       jobs:
-        - name: Promote confluentinc/gateway ubi9 AMD
+        - name: Promote confluentinc/cpc-gateway AMD
           env_vars:
             - name: DOCKER_IMAGE
-              value: confluentinc/gateway
+              value: confluentinc/cpc-gateway
           commands:
-            - export OS_TYPE="ubi9"
-            - export DOCKER_REPO="confluentinc/gateway"
-            - if [[ ! "$OS_TYPE" ]]; then export OS_TAG=""; elif [[ "$OS_TYPE" =~ $PROMOTE_OS_TYPE* ]]; then export OS_TAG="-$OS_TYPE"; fi
-            - export INTERNAL_IMAGE_TAG="$BRANCH_TAG-$PACKAGING_BUILD_NUMBER$OS_TAG$AMD_ARCH"
-            - export PROMOTED_TAG="$PROMOTED_TAG_PREFIX$OS_TAG$AMD_ARCH"
-            - docker pull $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG
-            - docker tag $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG $DOCKER_REPO:$PROMOTED_TAG
-            - docker run --rm $DOCKER_REPO:$PROMOTED_TAG sh -c "grep staging /etc/yum.repos.d/confluent.repo || grep staging /etc/apt/sources.list" || export STAGING_CHECK_SUCCEED="true"
-            - if [[ ! "$STAGING_CHECK_SUCCEED" ]]; then echo "Detected there was a staging repo in image $DOCKER_REPO:$PROMOTED_TAG refusing to promote." && exit 1; fi
-            - docker push $DOCKER_REPO:$PROMOTED_TAG
-            - >-
-              if [[ ! "$OS_TYPE" ]] || [[ "$OS_TYPE" =~ ubi* ]]; then
-                  export APPLY_TAG=$GATEWAY_VERSION$AMD_ARCH
-                  docker tag $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG $DOCKER_REPO:$APPLY_TAG
-                  docker push $DOCKER_REPO:$APPLY_TAG
-                  export APPLIED="true"
-              fi
-            - >-
-              if [[ $UPDATE_LATEST_TAG == "True" ]]; then
-                  if [[ $APPLIED ]]; then
-                  docker tag $DOCKER_REPO:$PROMOTED_TAG $DOCKER_REPO:latest$AMD_ARCH
-                  docker push $DOCKER_REPO:latest$AMD_ARCH
-                  fi
-                  docker tag $DOCKER_REPO:$PROMOTED_TAG $DOCKER_REPO:latest-$OS_TYPE$AMD_ARCH
-                  docker push $DOCKER_REPO:latest-$OS_TYPE$AMD_ARCH
-              fi
+            # Construct image tags for AMD64 architecture
+            - export SOURCE_IMAGE_TAG="$SOURCE_TAG$AMD_ARCH"      # master-45-ubi9-amd64
+            - export TARGET_TAG="$TARGET_VERSION$AMD_ARCH"        # 1.0.0-early-access-amd64
+            - export LATEST_TAG="latest$AMD_ARCH"                # latest-amd64
+            
+            # STEP 1: Pull the source image from ECR
+            - echo "Pulling source image: $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG"
+            - docker pull $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG
+            
+            # STEP 2: Tag and push versioned image to DockerHub
+            - echo "Tagging and pushing to $DEST_REPO:$TARGET_TAG"
+            - docker tag $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG $DEST_REPO:$TARGET_TAG
+            
+            # STEP 3: Validate image doesn't contain staging repositories (security check)
+            - docker run --rm $DEST_REPO:$TARGET_TAG sh -c "grep staging /etc/yum.repos.d/confluent.repo || grep staging /etc/apt/sources.list" || export STAGING_CHECK_SUCCEED="true"
+            - if [[ ! "$STAGING_CHECK_SUCCEED" ]]; then echo "Detected staging repo in image $DEST_REPO:$TARGET_TAG, refusing to promote." && exit 1; fi
+            
+            # STEP 4: Push versioned tag (1.0.0-early-access-amd64)
+            - docker push $DEST_REPO:$TARGET_TAG
+            
+            # STEP 5: Tag and push latest image to DockerHub
+            - echo "Tagging and pushing to $DEST_REPO:$LATEST_TAG"
+            - docker tag $DEST_REPO:$TARGET_TAG $DEST_REPO:$LATEST_TAG
+            - docker push $DEST_REPO:$LATEST_TAG
+  # STAGE 2: Promote ARM64 architecture images (runs in parallel with AMD64)
+  # This job handles the ARM64 version of the gateway image
   - name: Promote ARM
     dependencies: []
     task:
       jobs:
-        - name: Promote confluentinc/gateway ubi9 ARM
+        - name: Promote confluentinc/cpc-gateway ARM
           env_vars:
             - name: DOCKER_IMAGE
-              value: confluentinc/gateway
+              value: confluentinc/cpc-gateway
           commands:
-            - export OS_TYPE="ubi9"
-            - export DOCKER_REPO="confluentinc/gateway"
-            - if [[ ! "$OS_TYPE" ]]; then export OS_TAG=""; elif [[ "$OS_TYPE" =~ $PROMOTE_OS_TYPE* ]]; then export OS_TAG="-$OS_TYPE"; fi
-            - export INTERNAL_IMAGE_TAG="$BRANCH_TAG-$PACKAGING_BUILD_NUMBER$OS_TAG$ARM_ARCH"
-            - export PROMOTED_TAG="$PROMOTED_TAG_PREFIX$OS_TAG$ARM_ARCH"
-            - docker pull $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG
-            - docker tag $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG $DOCKER_REPO:$PROMOTED_TAG
-            - docker run --rm $DOCKER_REPO:$PROMOTED_TAG sh -c "grep staging /etc/yum.repos.d/confluent.repo || grep staging /etc/apt/sources.list" || export STAGING_CHECK_SUCCEED="true"
-            - if [[ ! "$STAGING_CHECK_SUCCEED" ]]; then echo "Detected there was a staging repo in image $DOCKER_REPO:$PROMOTED_TAG refusing to promote." && exit 1; fi
-            - docker push $DOCKER_REPO:$PROMOTED_TAG
-            - >-
-              if [[ ! "$OS_TYPE" ]] || [[ "$OS_TYPE" =~ ubi* ]]; then
-                  export APPLY_TAG=$GATEWAY_VERSION$ARM_ARCH
-                  docker tag $DOCKER_PROD_REGISTRY$DOCKER_REPO:$INTERNAL_IMAGE_TAG $DOCKER_REPO:$APPLY_TAG
-                  docker push $DOCKER_REPO:$APPLY_TAG
-                  export APPLIED="true"
-              fi
-            - >-
-              if [[ $UPDATE_LATEST_TAG == "True" ]]; then
-                  if [[ $APPLIED ]]; then
-                  docker tag $DOCKER_REPO:$PROMOTED_TAG $DOCKER_REPO:latest$ARM_ARCH
-                  docker push $DOCKER_REPO:latest$ARM_ARCH
-                  fi
-                  docker tag $DOCKER_REPO:$PROMOTED_TAG $DOCKER_REPO:latest-$OS_TYPE$ARM_ARCH
-                  docker push $DOCKER_REPO:latest-$OS_TYPE$ARM_ARCH
-              fi
+            # Construct image tags for ARM64 architecture
+            - export SOURCE_IMAGE_TAG="$SOURCE_TAG$ARM_ARCH"      # master-45-ubi9-arm64
+            - export TARGET_TAG="$TARGET_VERSION$ARM_ARCH"        # 1.0.0-early-access-arm64
+            - export LATEST_TAG="latest$ARM_ARCH"                # latest-arm64
+            
+            # STEP 1: Pull the source image from ECR
+            - echo "Pulling source image: $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG"
+            - docker pull $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG
+            
+            # STEP 2: Tag and push versioned image to DockerHub
+            - echo "Tagging and pushing to $DEST_REPO:$TARGET_TAG"
+            - docker tag $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_IMAGE_TAG $DEST_REPO:$TARGET_TAG
+            
+            # STEP 3: Validate image doesn't contain staging repositories (security check)
+            - docker run --rm $DEST_REPO:$TARGET_TAG sh -c "grep staging /etc/yum.repos.d/confluent.repo || grep staging /etc/apt/sources.list" || export STAGING_CHECK_SUCCEED="true"
+            - if [[ ! "$STAGING_CHECK_SUCCEED" ]]; then echo "Detected staging repo in image $DEST_REPO:$TARGET_TAG, refusing to promote." && exit 1; fi
+            
+            # STEP 4: Push versioned tag (1.0.0-early-access-arm64)
+            - docker push $DEST_REPO:$TARGET_TAG
+            
+            # STEP 5: Tag and push latest image to DockerHub
+            - echo "Tagging and pushing to $DEST_REPO:$LATEST_TAG"
+            - docker tag $DEST_REPO:$TARGET_TAG $DEST_REPO:$LATEST_TAG
+            - docker push $DEST_REPO:$LATEST_TAG
+  # STAGE 3: Create Multi-Architecture Manifests
+  # This job waits for both AMD64 and ARM64 promotions to complete,
+  # then creates unified manifests that automatically select the correct architecture
   - name: Create Manifest
-    dependencies: ["Promote AMD", "Promote ARM"]
+    dependencies: ["Promote AMD", "Promote ARM"]  # Wait for both architecture-specific jobs
     task:
       jobs:
-        - name: Create Manifest confluentinc/gateway ubi9
+        - name: Create Manifest confluentinc/cpc-gateway
           env_vars:
             - name: DOCKER_IMAGE
-              value: confluentinc/gateway
+              value: confluentinc/cpc-gateway
           commands:
-            - export OS_TYPE="ubi9"
-            - if [[ ! "$OS_TYPE" ]]; then export OS_TAG=""; elif [[ "$OS_TYPE" =~ $PROMOTE_OS_TYPE* ]]; then export OS_TAG="-$OS_TYPE"; fi
-            - export DOCKER_REPO="confluentinc/gateway"
-            - export PROMOTED_TAG="$PROMOTED_TAG_PREFIX$OS_TAG"
-            - docker manifest create $DOCKER_REPO:$PROMOTED_TAG $DOCKER_REPO:$PROMOTED_TAG$AMD_ARCH $DOCKER_REPO:$PROMOTED_TAG$ARM_ARCH
-            - docker manifest push $DOCKER_REPO:$PROMOTED_TAG
-            - >-
-              if [[ ! "$OS_TYPE" ]] || [[ "$OS_TYPE" =~ ubi* ]]; then
-                  docker manifest create $DOCKER_REPO:$GATEWAY_VERSION $DOCKER_REPO:$GATEWAY_VERSION$AMD_ARCH $DOCKER_REPO:$GATEWAY_VERSION$ARM_ARCH
-                  docker manifest push $DOCKER_REPO:$GATEWAY_VERSION
-                  export APPLIED="true"
-              fi
-            - >-
-              if [[ $UPDATE_LATEST_TAG == "True" ]]; then
-                  if [[ $APPLIED ]]; then
-                  docker manifest create $DOCKER_REPO:latest $DOCKER_REPO:latest$AMD_ARCH $DOCKER_REPO:latest$ARM_ARCH
-                  docker manifest push $DOCKER_REPO:latest
-                  fi
-                  docker manifest create $DOCKER_REPO:latest-$OS_TYPE $DOCKER_REPO:latest-$OS_TYPE$AMD_ARCH $DOCKER_REPO:latest-$OS_TYPE$ARM_ARCH
-                  docker manifest push $DOCKER_REPO:latest-$OS_TYPE
-              fi
+            # Create multi-architecture manifest for versioned tag
+            # This allows 'docker pull confluentinc/cpc-gateway:1.0.0-early-access' to work on any platform
+            - echo "Creating multi-architecture manifest for $DEST_REPO:$TARGET_VERSION"
+            - docker manifest create $DEST_REPO:$TARGET_VERSION $DEST_REPO:$TARGET_VERSION$AMD_ARCH $DEST_REPO:$TARGET_VERSION$ARM_ARCH
+            - docker manifest push $DEST_REPO:$TARGET_VERSION
+            
+            # Create multi-architecture manifest for latest tag
+            # This allows 'docker pull confluentinc/cpc-gateway:latest' to work on any platform
+            - echo "Creating multi-architecture manifest for $DEST_REPO:latest"
+            - docker manifest create $DEST_REPO:latest $DEST_REPO:latest$AMD_ARCH $DEST_REPO:latest$ARM_ARCH
+            - docker manifest push $DEST_REPO:latest
+            
+            - echo "✅ Manifest creation completed successfully"
+            - echo "📦 Available tags:"
+            - echo "   - confluentinc/cpc-gateway:1.0.0-early-access (multi-arch)"
+            - echo "   - confluentinc/cpc-gateway:latest (multi-arch)"
+            - echo "   - confluentinc/cpc-gateway:1.0.0-early-access-amd64"
+            - echo "   - confluentinc/cpc-gateway:1.0.0-early-access-arm64"
+            - echo "   - confluentinc/cpc-gateway:latest-amd64"
+            - echo "   - confluentinc/cpc-gateway:latest-arm64"
