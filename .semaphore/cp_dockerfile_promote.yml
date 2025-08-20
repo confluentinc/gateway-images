@@ -35,8 +35,8 @@ global_job_config:
       - export TARGET_VERSION="1.0.0-early-access"            # Target version tag for promotion
       - echo "Promoting $DOCKER_PROD_REGISTRY$SOURCE_REPO:$SOURCE_TAG to $DEST_REPO:$TARGET_VERSION and latest"
       - docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY  # Login to DockerHub
-      - export AMD_ARCH="-amd64"                               # AMD64 architecture suffix
-      - export ARM_ARCH="-arm64"                               # ARM64 architecture suffix
+      - export AMD_ARCH=".amd64"                               # AMD64 architecture suffix
+      - export ARM_ARCH=".arm64"                               # ARM64 architecture suffix
 
 blocks:
   # STAGE 1: Promote AMD64 architecture images
