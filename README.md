@@ -13,7 +13,7 @@ Please see the CHANGELOG.md for details of recent updates.
 ```bash
 export CONFLUENT_PACKAGES_REPO="https://staging-packages.confluent.io/rpm/8.0"
 export GATEWAY_VERSION=1.0.0
-export DOCKER_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
+export DOCKER_REGISTRY=""
 export BUILD_NUMBER=$(date +%Y%m%d%H%M%S)
 export GIT_COMMIT=$(git rev-parse HEAD)
 export DOCKER_DEV_TAG="local-dev-${BUILD_NUMBER}-${GIT_COMMIT}"
@@ -39,7 +39,7 @@ export DOCKER_TAG=$DOCKER_DEV_TAG
 
 # Run Docker
 ```bash
-export DOCKER_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
-export GATEWAY_DOCKER_IMAGE=$DOCKER_REGISTRY/confluentinc/gateway:dev-master-d1f36e72-ubi9.arm64
+export DOCKER_REGISTRY=""
+export GATEWAY_DOCKER_IMAGE=$DOCKER_REGISTRY/confluentinc/cpc-gateway:latest
 docker compose up -d
 ```
