@@ -4,7 +4,7 @@
 
 - Client Switchover can also be used to enable Disaster Recovery Switch from unhealthy cluster to a healthy cluster. It helps in significantly reducing the RTO by avoiding client side changes during a DR scenario. 
 
-- Client Switchover can also ease the on-premise broker upgrades by enabling Blue-Green upgrade strategies.
+- Client Switchover can also facilitate easier on-premise broker upgrades by enabling Blue-Green deployment strategies.
 
 - Data replication has to be setup outside of CPC Gateway as per your requirements using tools like Cluster Linking.
 
@@ -75,7 +75,7 @@ gateway:
 ### What's here
 - `kafka-compose.yaml`: spins up two single-node Kafka clusters (kafka-1 and kafka-2)
 - `gateway-compose.yaml`: spins up Gateway container configured to proxy both Kafka clusters
-- `kafka_server_jaas.conf`: JAAS config for Kafka authentication
+- `kafka_server_jaas.conf`: Kafka server JAAS config for authentication
 - `start-kafka.sh`: script to start Kafka clusters
 - `start-gateway.sh`: script to start Gateway
 
