@@ -1,5 +1,7 @@
 # Setting up Network Isolation and Custom Domains for a private Kafka Cluster using CPC Gateway
 
+Custom domains give you the flexibility to customise the Kafka listener endpoints as per your requirements. Network isolation for a Kafka cluster enables private cluster access without letting external clients to your private network. Both custom domains and network isolation helps you enable external partner access for your Kafka clusters/data as per your compliance policies.
+
 
 ## Gateway Configuration Example
 
@@ -102,7 +104,7 @@ password="admin-secret";
 
 Since the partner-access-route Route is available at Gateway's my-custom-domain-name:19092, we need the clients to connect to my-custom-domain-name:19092 to stream data. 
 
-Following are the commands to create a topic, produce and consume to the passthrough Route using the Gateway. All this traffic will be forwarded by Gateway to broker's internal Kafka listener as per the Gateway setup.
+Following are the commands to create a topic, produce and consume using Gateway. All this traffic will be forwarded by Gateway to broker's external Kafka listener as per the Gateway setup.
 
 Command to create a topic via the Gateway 
 ```
