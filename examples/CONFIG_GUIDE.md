@@ -60,13 +60,13 @@ streamingDomains:
 ```yaml
 routes:
   - name: eu-sales               # unique across routes
-    endpoint: gw.sales.example.com:9092  # what clients connect to
+    endpoint: eu-gw.sales.example.com:9092  # what clients connect to
 
     brokerIdentificationStrategy:
       # How clients discover individual brokers
       type: port | host
       # when type=host
-      pattern: broker-$(nodeId).gw.sales.example.com:9092
+      pattern: broker-$(nodeId).eu-gw.sales.example.com:9092
 
     streamingDomain:
       name: sales               # must reference gateway.streamingDomains[].name
