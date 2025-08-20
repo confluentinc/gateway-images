@@ -278,8 +278,8 @@ __Not Supported__
       config:
         vaultUrl: https://authswap.vault.azure.net/
         credentialType: ClientCertificate
-        tenantId: 0893715b-959b-4906-a185-2789e1ead045
-        clientId: 1b4e0478-8dfb-47eb-9e63-dd8c2ce10384
+        tenantId: xxxx-xxxx-xxxx-xxxx-xxxxxxxx
+        clientId: xxxx-xxxx-xxxx-xxxx-xxxxxxxx
         certificateType: PFX
         certificatePath: /opt/ssl/client-cert.pfx
         certificatePfxPassword: <pfx-password>
