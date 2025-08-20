@@ -1,4 +1,6 @@
-# Configuring Gateway
+# Gateway Configuration Guide
+
+## Table of Contents
 
 - [1. Top-Level Layout](#1-top-level-layout)
 - [2. Streaming Domains](#2-streaming-domains)
@@ -50,7 +52,6 @@ ssl: {}                         # Optional, required for SSL/SASL_SSL
 
 See [SSL Configuration](#6-ssl-configuration) section for details.
 
-
 ### Full Example
 
 ```yaml
@@ -84,9 +85,10 @@ streamingDomains:
           end: 3                # inclusive
 ```
 
-#### Notes
-- `password` can be a file path or an inline value.
-- `ignoreTrust` is used to skip certificate validation (not recommended for production). Other settings will be ignored if `ignoreTrust` is true.
+### Notes
+
+- `password` can be a file path or an inline value
+- `ignoreTrust` is used to skip certificate validation (not recommended for production). Other settings will be ignored if `ignoreTrust` is true
 
 ## 3. Routes
 
@@ -105,10 +107,11 @@ security: {}
 ```
 
 ### 3.2 Route.Security
+
 ```yaml
 auth: passthrough | swap         # passthrough: clients connect directly to brokers, swap: auth swap
 ssl: {}
-swapConfig: {}                # Required if auth=swap
+swapConfig: {}                   # Required if auth=swap
 ```
 
 ### 3.3 Route.Security.Ssl
@@ -196,7 +199,7 @@ tokenEndpointUri: string      # URI for the OAuth token endpoint
 
 ```yaml
 routes:
-  - name: eu-sales               # unique across routes
+  - name: eu-sales                          # unique across routes
     endpoint: eu-gw.sales.example.com:9092  # what clients connect to
 
     brokerIdentificationStrategy:
@@ -206,11 +209,11 @@ routes:
       pattern: broker-$(nodeId).eu-gw.sales.example.com:9092
 
     streamingDomain:
-      name: sales               # must reference gateway.streamingDomains[].name
-      bootstrapServerId: SASL_SSL-1 # must match kafkaCluster.bootstrapServers[].id
+      name: sales                             # must reference gateway.streamingDomains[].name
+      bootstrapServerId: SASL_SSL-1           # must match kafkaCluster.bootstrapServers[].id
     security:
       auth: passthrough | swap
-      ssl:                      # gateway side TLS/mTLS
+      ssl:                                    # gateway side TLS/mTLS
         ignoreTrust: false
         truststore:
           type: PKCS12
@@ -224,13 +227,13 @@ routes:
             file: /opt/secrets/gw-keystore.password
           keyPassword:
             value: inline-password
-        clientAuth: required    # required|requested|none
+        clientAuth: required                  # required|requested|none
 
       # Only when auth=swap (examples below)
       swapConfig:
-        clientAuth:             # how clients auth to the gateway
+        clientAuth:                           # how clients auth to the gateway
           sasl:
-            mechanism: PLAIN    # PLAIN | OAUTHBEARER | ...
+            mechanism: PLAIN                  # PLAIN | OAUTHBEARER | ...
             callbackHandlerClass: "org.apache.kafka.common.security.plain.PlainServerCallbackHandler"
             jaasConfig:
               file: /opt/gateway/gw-users.conf
@@ -247,35 +250,36 @@ routes:
               tokenEndpointUri: https://idp.company.com/realms/cp/protocol/openid-connect/token
 ```
 
-#### Notes
-- `port` strategy requires matching nodeIdRanges on the referenced kafkaCluster.
-- `host` strategy requires pattern with `$(nodeId)` placeholder.
-- supported certificate types: `JKS`, `PKCS12` & `PEM`
+### 3.6 Notes
+
+- `port` strategy requires matching nodeIdRanges on the referenced kafkaCluster
+- `host` strategy requires pattern with `$(nodeId)` placeholder
+- Supported certificate types: `JKS`, `PKCS12` & `PEM`
 
 ## 4. Admin and Metrics
 
 ```yaml
 admin:
-  bindAddress: 0.0.0.0   # default
-  port: 9190             # default
+  bindAddress: 0.0.0.0                 # default
+  port: 9190                           # default
   endpoints:
     metrics: true
-  jvmMetrics:            # jvmMetrics enabled by default. Use any micrometer supported metrics.
+  jvmMetrics:                          # jvmMetrics enabled by default. Use any micrometer supported metrics.
     - JvmGcMetrics
     - JvmMemoryMetrics
     - JvmThreadMetrics
     - ProcessorMetrics
     - UptimeMetrics
-  commonTags:            # optional
+  commonTags:                          # optional
     host: pod-0
     region: us-west-2
 ```
 
 ## 5. Secret Stores
 
-### Hashicorp Vault
+### 5.1 HashiCorp Vault
 
-#### Connect using Auth Token
+#### 5.1.1 Connect using Auth Token
 ```yaml
 secretStores:
   - name: kms1
@@ -289,7 +293,7 @@ secretStores:
         separator: ":"           # optional
 ```
 
-#### Connect using AppRole
+#### 5.1.2 Connect using AppRole
 ```yaml
   - name: kms1
     provider:
@@ -304,7 +308,7 @@ secretStores:
         separator: ":"           # optional
 ```
 
-#### Connect using Username/Password
+#### 5.1.3 Connect using Username/Password
 ```yaml
   - name: kms1
     provider:
@@ -319,26 +323,26 @@ secretStores:
         separator: ":"          # optional
 ```
 
-#### Connect using Certificates
+#### 5.1.4 Connect using Certificates
 
 _Not Supported_
 
-### AWS Secrets Manager
+### 5.2 AWS Secrets Manager
 
-#### Connect using IAM Role
+#### 5.2.1 Connect using IAM Role
 ```yaml
   - name: aws-secrets
     provider:
       type: AWS
       config:
         region: us-west-2
-        endpointOverride: https://secretsmanager.us-west-2.amazonaws.com # optional, defaults to AWS region endpoint
-        prefixPath: confluent- # optional, defaults to empty
-        separator: ":" # optional, defaults to ":"
-        useJson: true # if true, expects secrets in JSON format
+        endpointOverride: https://secretsmanager.us-west-2.amazonaws.com  # optional, defaults to AWS region endpoint
+        prefixPath: confluent-           # optional, defaults to empty
+        separator: ":"                   # optional, defaults to ":"
+        useJson: true                    # if true, expects secrets in JSON format
 ```
 
-#### Connect using Access Key and Secret Key
+#### 5.2.2 Connect using Access Key and Secret Key
 ```yaml
   - name: aws-secrets
     provider:
@@ -353,9 +357,9 @@ _Not Supported_
         useJson: true # if true, expects secrets in JSON format
 ```
 
-### Azure Key Vault
+### 5.3 Azure Key Vault
 
-#### Connect using Client ID and Secret
+#### 5.3.1 Connect using Client ID and Secret
 
 ```yaml
   - name: azure-keyvault
@@ -371,7 +375,7 @@ _Not Supported_
         separator: ":"
 ```
 
-#### Connect using Username and Password
+#### 5.3.2 Connect using Username and Password
 
 ```yaml
   - name: azure-keyvault
@@ -388,9 +392,9 @@ _Not Supported_
         separator: ":" # optional, defaults to ":"
 ```
 
-#### Connect using Client Certificate
+#### 5.3.3 Connect using Client Certificate
 
-##### PEM certificate
+##### 5.3.3.1 PEM certificate
 
 ```yaml
   - name: azure-keyvault
@@ -406,7 +410,7 @@ _Not Supported_
         separator: ":" # optional, defaults to ":"
 ```
 
-##### PFX certificate
+##### 5.3.3.2 PFX certificate
 
 ```yaml
   - name: azure-keyvault
@@ -426,7 +430,7 @@ _Not Supported_
 
 ## 6. SSL Configuration
 
-### SSL Configuration
+### 6.1 SSL Configuration
 
 ```yaml
 ignoreTrust: boolean            # Skip certificate validation (not recommended for production)
@@ -434,7 +438,7 @@ truststore: {}                  # Truststore configuration
 keystore: {}                    # Keystore configuration (gateway identity)
 ```
 
-### Truststore and Keystore
+### 6.2 Truststore and Keystore
 
 ```yaml
 type: string                    # Certificate type (JKS, PKCS12, PEM)
@@ -444,12 +448,12 @@ password: {}                    # Password for the truststore/keystore
 
 ## 7. Password Configuration
 
-#### File based
+### 7.1 File based
 ```yaml
 file: string                     # Path to a file containing the password
 ```
 
-#### Inline value
+### 7.2 Inline value
 ```yaml
 value: string                    # Inline password value
 ```
