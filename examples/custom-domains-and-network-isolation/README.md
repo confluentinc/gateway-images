@@ -14,7 +14,7 @@ Custom domains give you the flexibility to customise the Kafka listener endpoint
  - Two seperate networks are defined for kafka and gateway in the local docker network. Kafka brokers are isolated in a private docker network. 
  - partner-access-route route is created with a custom domain name "my-custom-domain-name" and port 19092. This route is used by external clients to connect to the kafka-1 broker via the Gateway. For example, clients use "my-custom-domain-name:19092" as the bootstrap server address.
  - Setting this custom domain name rather than using localhost requires setting up the host resolution in /etc/hosts file.
- - Port based routing is used for this partner-access-route is configured for simplicity of local experience. 
+ - Port based routing is used for this partner-access-route for simplicity of local experience. 
 
 
 ```yaml
@@ -113,7 +113,7 @@ Command to create a topic via the Gateway
 
 Command to run the producer
 ```
-./kafka-console-producer --bootstrap-server my-custom-domain-name:19092 --topic test-topic --consumer.config client_sasl.properties
+./kafka-console-producer --bootstrap-server my-custom-domain-name:19092 --topic test-topic --producer.config client_sasl.properties
 ```
 
 Command to run the consumer 

@@ -91,7 +91,7 @@ Command to create a topic via the Gateway
 
 Command to run the producer
 ```
-./kafka-console-producer --bootstrap-server localhost:19092 --topic test-topic --consumer.config client_sasl.properties
+./kafka-console-producer --bootstrap-server localhost:19092 --topic test-topic --producer.config client_sasl.properties
 ```
 
 Command to run the consumer 
