@@ -44,7 +44,7 @@ In this setup:
 | 1 | Client | Authenticates to Gateway | **Credentials:** `test_user`/`test_password`<br><br>Uses SASL PLAIN authentication |
 | 2 | Gateway | Authenticates incoming client | **JAAS Config (`jaas-config-for-gw-authn.conf`):**<br>```org.apache.kafka.common.security.plain.PlainLoginModule required user_test_user="test_password";``` |
 | 3 | Gateway | Fetches swapped credentials | **From Vault:** Looks up credentials for `test_user`<br>Gets `swapped_password` |
-| 4 | Gateway | Forwards to Kafka broker | **JAAS Template (`jaas-template-for-gw-swapping.conf`):**<br>```org.apache.kafka.common.security.plain.PlainLoginModule required username="%s" password="%s";```<br><br>Values filled in as: `test_user`/`swapped_password` |
+| 4 | Gateway | Forwards to Kafka broker | **JAAS Template (`jaas-template-for-gw-swapping.conf`):**<br>```org.apache.kafka.common.security.plain.PlainLoginModule required username="%s" password="%s";```<br><br>Values filled in as: `test_user`/`swapped_password` . JAAS conf used by Gateway needs to be in template format so that Gateway can dynamically populate using the fetched credentials  |
 | 5 | Kafka Broker | Authenticates Gateway | **JAAS Config (`jaas-config-for-broker-authn.conf`):**<br>```KafkaServer { org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret" user_admin="admin-secret" user_test_user="swapped_password";};``` 
 
 ## Gateway Configuration
