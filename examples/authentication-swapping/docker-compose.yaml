@@ -1,5 +1,28 @@
 services:
 
+  vault:
+    image: hashicorp/vault:1.14
+    hostname: vault
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+      VAULT_DEV_ROOT_TOKEN_ID: "vault-plaintext-root-token"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./usr/local/bin/docker-entrypoint.sh server -dev &
+        echo "Waiting for Vault to start..."
+        # Wait until vault is ready
+        while ! vault status; do sleep 1; done
+        export VAULT_TOKEN=$( echo $${VAULT_DEV_ROOT_TOKEN_ID})
+        # Write secrets to the Vault secrets engine
+        vault kv put secret/testing test_user=test_user/swapped_password
+        sleep infinity
+
 # Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller. 
   kafka-1:
     image: confluentinc/cp-server:latest
@@ -46,6 +69,7 @@ services:
     container_name: gateway
     depends_on:
       - kafka-1
+      - vault
     volumes:
       - ${GATEWAY_JAAS_CONF_FOR_GW_AUTHN}:/etc/gateway/config/jaas-config-for-gw-authn.conf # loading JAAS config for SASL authentication at Gateway
       - ${GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING}:/etc/gateway/config/jaas-template-for-gw-swapping.conf # loading JAAS template for SASL authentication at Gateway
@@ -56,13 +80,13 @@ services:
             endpoints:
               metrics: true
           secretStores:
-            - name: AWS-secret-store
+            - name: vault-secret-store
               provider:
-                type: AWS
+                type: Vault
                 config:
-                  region: us-west-2
-                  accessKey: ${AWS_ACCESS_KEY}
-                  secretKey: ${AWS_SECRET_KEY}
+                  address: http://vault:8200
+                  authToken: vault-plaintext-root-token
+                  path: secret/testing
                   separator: /
       
           streamingDomains:
@@ -94,7 +118,7 @@ services:
                       callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
                       jaasConfig:
                         file: /etc/gateway/config/jaas-config-for-gw-authn.conf
-                  secretStore: AWS-secret-store
+                  secretStore: vault-secret-store
                   clusterAuth:
                     sasl:
                       mechanism: PLAIN
@@ -113,4 +137,3 @@ services:
         chmod +x /etc/confluent/docker/run 2>/dev/null || true
         exec /etc/confluent/docker/run
       "
-
