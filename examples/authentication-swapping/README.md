@@ -134,7 +134,15 @@ The following environment variables are set in `start.sh`:
 - `GATEWAY_JAAS_CONF_FOR_GW_AUTHN`: Path to Gateway authentication JAAS config
 - `GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING`: Path to Gateway swapping JAAS template
 
-### 1. Start the Services
+
+### 1. Update the Hosts file and Start the Services
+
+Add the following in your /etc/hosts
+
+```
+127.0.0.1   host.docker.internal
+```
+
 ```bash
 # Make the start script executable
 chmod +x start.sh
