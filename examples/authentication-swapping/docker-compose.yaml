@@ -1,5 +1,11 @@
 services:
 
+# Below is a set of configs to bring up a vault container that acts as a secret store. This is used to store the secrets for the authentication swapping.
+# After Gateway authentication is successful, Gateway extracts the principal of the incoming client and uses it to fetch the swapped credentials from the secret store.
+# This swapped credentials are then used to authenticate the client to the kafka-1 broker.
+# In the below example, we are storing the swapped credentials for the test_user in the secret store. 
+# Post authentication swapping, the client will use the swapped credentials to authenticate to the kafka-1 broker.
+# You can also view the Vault UI by hitting http://localhost:8200/ and login using vault-plaintext-root-token as the password
   vault:
     image: hashicorp/vault:1.14
     hostname: vault
@@ -45,7 +51,7 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
-      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/jaas-config-for-broker-authn.conf'
+      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/jaas-config-for-broker-authn.conf' # loading JAAS config for SASL authentication at kafka-1 broker. This is used to authenticate the client to the kafka-1 broker.
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -61,8 +67,12 @@ services:
 
  # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
  # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
- # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
- # Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
+ # This Gateway exposes one route called auth-swap-route. This route endpoint is running at host.docker.internal:19092. 
+ # Clients stream data to Kafka-1 brokers via this route. Authentication swapping is enabled for this route.
+ # When authentication swapping is enabled, Gateway will authenticate the incoming client and post successfull authentication, it will extract the principal of the incoming client and use it to fetch the swapped credentials from the secret store.
+ # Gateway forwards the request to the kafka-1 broker using the swapped credentials. Broker will perform authentication using the swapped credentials.
+ # For simplicity of local development, we are using port based routing, disabled encryption from client to gateway and gateway to broker.
+ # In a production environment, you should use TLS encryption from client to gateway and gateway to broker. And use SNI routing for routing requests to the correct broker.
 
   gateway:
     image: "${GATEWAY_IMAGE}"
