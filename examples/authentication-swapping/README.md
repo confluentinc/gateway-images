@@ -27,10 +27,10 @@ More details on how to configure Gateway with different secret stores are availa
 ## Overview - Authentication Flow and Configuration
 
 In this setup:
-- **Clients** authenticate to the Gateway using their original credentials
+- **Client** authenticate to the Gateway using the credentials that gateway has been configured with.
 - **Gateway** authenticates clients and extracts their principal
 - **Gateway** fetches swapped credentials from a secret store (Vault) using the client's principal
-- **Gateway** forwards authentication requests to Kafka using the swapped credentials
+- **Gateway** establishes authorised connection to Kafka using the swapped credentials
 - **Kafka broker** authenticates using the swapped credentials
 
 
@@ -135,19 +135,15 @@ The following environment variables are set in `start.sh`:
 - `GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING`: Path to Gateway swapping JAAS template
 
 
-### 1. Update the Hosts file and Start the Services
-
-Add the following in your /etc/hosts
-
-```
-127.0.0.1   host.docker.internal
-```
+### 1. Start the Services
+Make the start script executable
 
 ```bash
-# Make the start script executable
 chmod +x start.sh
+```
 
-# Start all services
+Start all services
+```bash
 ./start.sh
 ```
 
