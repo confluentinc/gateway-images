@@ -1,5 +1,34 @@
 services:
 
+# Below is a set of configs to bring up a vault container that acts as a secret store. This is used to store the secrets for the authentication swapping.
+# After Gateway authentication is successful, Gateway extracts the principal of the incoming client and uses it to fetch the swapped credentials from the secret store.
+# This swapped credentials are then used to authenticate the client to the kafka-1 broker.
+# In the below example, we are storing the swapped credentials for the test_user in the secret store. 
+# Post authentication swapping, the client will use the swapped credentials to authenticate to the kafka-1 broker.
+# You can also view the Vault UI by hitting http://localhost:8200/ and login using vault-plaintext-root-token as the password
+  vault:
+    image: hashicorp/vault:1.14
+    hostname: vault
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+      VAULT_DEV_ROOT_TOKEN_ID: "vault-plaintext-root-token"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./usr/local/bin/docker-entrypoint.sh server -dev &
+        echo "Waiting for Vault to start..."
+        # Wait until vault is ready
+        while ! vault status; do sleep 1; done
+        export VAULT_TOKEN=$( echo $${VAULT_DEV_ROOT_TOKEN_ID})
+        # Write secrets to the Vault secrets engine
+        vault kv put secret/testing test_user=test_user/swapped_password
+        sleep infinity
+
 # Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller. 
   kafka-1:
     image: confluentinc/cp-server:latest
@@ -16,13 +45,13 @@ services:
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-1:9093'
       CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT'
-      KAFKA_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://0.0.0.0:33333, CONTROLLER://kafka-1:9093'
+      KAFKA_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://0.0.0.0:33333,CONTROLLER://kafka-1:9093'
       KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://localhost:33333'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
-      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/jaas-config-for-broker-authn.conf'
+      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/jaas-config-for-broker-authn.conf' # loading JAAS config for SASL authentication at kafka-1 broker. This is used to authenticate the client to the kafka-1 broker.
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
@@ -38,14 +67,19 @@ services:
 
  # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
  # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
- # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
- # Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
+ # This Gateway exposes one route called auth-swap-route. This route endpoint is running at localhost:19092. 
+ # Clients stream data to Kafka-1 brokers via this route. Authentication swapping is enabled for this route.
+ # When authentication swapping is enabled, Gateway will authenticate the incoming client and post successfull authentication, it will extract the principal of the incoming client and use it to fetch the swapped credentials from the secret store.
+ # Gateway forwards the request to the kafka-1 broker using the swapped credentials. Broker will perform authentication using the swapped credentials.
+ # For simplicity of local development, we are using port based routing, disabled encryption from client to gateway and gateway to broker.
+ # In a production environment, you should use TLS encryption from client to gateway and gateway to broker. And use SNI routing for routing requests to the correct broker.
 
   gateway:
     image: "${GATEWAY_IMAGE}"
     container_name: gateway
     depends_on:
       - kafka-1
+      - vault
     volumes:
       - ${GATEWAY_JAAS_CONF_FOR_GW_AUTHN}:/etc/gateway/config/jaas-config-for-gw-authn.conf # loading JAAS config for SASL authentication at Gateway
       - ${GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING}:/etc/gateway/config/jaas-template-for-gw-swapping.conf # loading JAAS template for SASL authentication at Gateway
@@ -56,13 +90,13 @@ services:
             endpoints:
               metrics: true
           secretStores:
-            - name: AWS-secret-store
+            - name: vault-secret-store
               provider:
-                type: AWS
+                type: Vault
                 config:
-                  region: us-west-2
-                  accessKey: ${AWS_ACCESS_KEY}
-                  secretKey: ${AWS_SECRET_KEY}
+                  address: http://vault:8200
+                  authToken: vault-plaintext-root-token
+                  path: secret/testing
                   separator: /
       
           streamingDomains:
@@ -79,7 +113,7 @@ services:
                     endpoint: "kafka-1:44444" 
           routes:
             - name: auth-swap-route
-              endpoint: "host.docker.internal:19092" 
+              endpoint: "localhost:19092" 
               brokerIdentificationStrategy:
                 type: port 
               streamingDomain:
@@ -94,7 +128,7 @@ services:
                       callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
                       jaasConfig:
                         file: /etc/gateway/config/jaas-config-for-gw-authn.conf
-                  secretStore: AWS-secret-store
+                  secretStore: vault-secret-store
                   clusterAuth:
                     sasl:
                       mechanism: PLAIN
@@ -103,14 +137,16 @@ services:
                         file: /etc/gateway/config/jaas-template-for-gw-swapping.conf
 
 
-    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests.
+    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests.nodeIdRanges are 1 to 5. ports from 19092 (bootstrap), 19093 (nodeId=1), 19094, 19095, 19096, 19097 (nodeId=5) should be exposed.
       - "19092:19092"
       - "19093:19093"
       - "19094:19094"
+      - "19095:19095"
+      - "19096:19096"
+      - "19097:19097"
       - "9190:9190"
     command: |
       bash -c "
         chmod +x /etc/confluent/docker/run 2>/dev/null || true
         exec /etc/confluent/docker/run
       "
-
