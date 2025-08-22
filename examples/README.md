@@ -15,7 +15,7 @@ Confluent Private Cloud Gateway helps you
 
 - Enable Blue-Green upgrades from an earlier Kafka version to a latest Kafka version.
 
-Currently Confluent Private Cloud Gateway is an Early Access product and is NOT officially supported for production workloads.
+Confluent Private Cloud Gateway uses OSS Kroxylicous as the Kafka proxy internally. Currently it is an Early Access product and is NOT officially supported for production workloads.
 
 ## How does Confluent Private Cloud Gateway work?
 
