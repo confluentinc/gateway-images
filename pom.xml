@@ -26,7 +26,7 @@
     </parent>
 
     <groupId>io.confluent.gateway-images</groupId>
-    <artifactId>gateway-images-parent</artifactId>
+    <artifactId>cpc-gateway-images-parent</artifactId>
     <packaging>pom</packaging>
     <name>Gateway Docker Images</name>
     <description>Build files for Confluent's Gateway Docker Images</description>
