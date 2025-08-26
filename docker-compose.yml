@@ -3,10 +3,10 @@ services:
         hostname: gateway
         image: ${DOCKER_REGISTRY}confluentinc/cpc-gateway:${GATEWAY_VERSION:-latest}
         ports:
-            - "9192:9192"
-            - "9193:9193"
-            - "9194:9194"
-            - "9195:9195"
+            - "9192:9192" # bootstrap
+            - "9193:9193" # nodeId: 0
+            - "9194:9194" # nodeId: 1
+            - "9195:9195" # nodeId: 2
             - "19095:19095"  # Admin port
         environment:
           GATEWAY_CONFIG: |

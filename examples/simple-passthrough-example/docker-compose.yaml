@@ -9,7 +9,7 @@ services:
       - "44444:44444"  # Internal listener port (for internal communication)
       - "9093:9093"    # Controller port (for controller communication)
     volumes:
-      - ${KAFKA_SERVER_JAAS_CONF}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
+      - ${KAFKA_SERVER_JAAS_CONF:-./kafka_server_jaas.conf}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -42,7 +42,7 @@ services:
  # Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
 
   gateway:
-    image: "${GATEWAY_IMAGE}"
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
     container_name: gateway
     depends_on:
       - kafka-1
