@@ -32,6 +32,7 @@ Add the following entry to your `/etc/hosts` file:
 sudo vi /etc/hosts
 ```
 ```
+127.0.0.1   kafka.gateway.local
 127.0.0.1   broker1.kafka.gateway.local
 ```
 
@@ -43,6 +44,7 @@ Run the start script which will:
 - Start the Kafka and Gateway services
 
 ```bash
+chmod +x start.sh
 ./start.sh
 ```
 
@@ -106,6 +108,7 @@ The `./ssl/` directory will contain:
 
 To validate that everything is working correctly:
 ```bash
+chmod +x validate.sh
 ./validate.sh
 ```
 
@@ -119,6 +122,7 @@ This script will:
 
 To completely clean up the environment:
 ```bash
+chmod +x cleanup.sh
 ./cleanup.sh
 ```
 
