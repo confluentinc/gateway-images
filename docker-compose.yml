@@ -1,7 +1,7 @@
 services:
     gateway:
         hostname: gateway
-        image: ${GATEWAY_DOCKER_IMAGE}
+        image: ${DOCKER_REGISTRY}confluentinc/cpc-gateway:${GATEWAY_VERSION:-latest}
         ports:
             - "9192:9192"
             - "9193:9193"
