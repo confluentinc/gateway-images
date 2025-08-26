@@ -1,0 +1,73 @@
+services:
+
+# Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 and kafka-2 brokers.  
+# kafka-1 is onboarded with the Gateway with streaming domain kafka1-domain on internal-kafka1-listener.
+# kafka-2 is onboarded with the Gateway with streaming domain kafka2-domain on internal-kafka2-listener.
+# When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication. Broker will perform authentication. 
+# Switchover route on Gateway is created to connect to the kafka-1 broker on Gateway port 19092. Name of the route is switchover-route. This means, all the traffic addressed to switchover-route will be forwarded to the kafka-1 broker.
+# To switchover the clients to kafka-2, we need to change the switchover-route to point to kafka-2. This is done by updating the streaming domain and corresponding bootstrap server id in the switchover-route.
+# For simplicity, we are using port based routing, disabled encryption and ensured the client has same credentials for both the clusters. 
+
+  gateway:
+    image: "${GATEWAY_IMAGE}"
+    container_name: gateway
+    external_links:
+      - kafka-1
+      - kafka-2
+    environment:
+      GATEWAY_CONFIG: | 
+        gateway:
+          admin:
+            endpoints:
+              metrics: true
+          streamingDomains:
+            - name: kafka1-domain  
+              type: kafka
+              kafkaCluster:
+                name: kafka-cluster-1 
+                nodeIdRanges:
+                  - name: d
+                    start: 1 
+                    end: 5
+                bootstrapServers:
+                  - id: internal-kafka1-listener  
+                    endpoint: "kafka-1:44444" 
+            - name: kafka2-domain  
+              type: kafka
+              kafkaCluster:
+                name: kafka-cluster-2 
+                nodeIdRanges:
+                  - name: d
+                    start: 1 
+                    end: 5
+                bootstrapServers:
+                  - id: internal-kafka2-listener  
+                    endpoint: "kafka-2:22222" 
+          routes:
+            - name: switchover-route
+              endpoint: "host.docker.internal:19092" 
+              brokerIdentificationStrategy:
+                type: port 
+              streamingDomain:
+                name: kafka1-domain
+                bootstrapServerId: internal-kafka1-listener 
+              security:
+                auth: passthrough 
+
+    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests. 
+      - "19092:19092"
+      - "19093:19093"
+      - "19094:19094"
+      - "9190:9190"
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    external: true
+    name: client-switchover_default

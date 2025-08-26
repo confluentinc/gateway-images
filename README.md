@@ -1,7 +1,8 @@
 # gateway-images
 
-This repository is part of the Confluent organization on GitHub.
-It is public and open to contributions from the community.
+This repository hosts the docker image source files for Confluent Private Cloud Gateway. Please checkout the examples section more details on Confluent Private Cloud Gateway and how to get started with it.
+
+It is part of the Confluent organization on GitHub. It is public and open to contributions from the community.
 
 Please see the LICENSE file for contribution terms.
 Please see the CHANGELOG.md for details of recent updates.
@@ -36,3 +37,9 @@ export DOCKER_TAG=$DOCKER_DEV_TAG
   -Ddocker.os_type=ubi9
 ```
 
+# Run Docker
+```bash
+export DOCKER_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
+export GATEWAY_DOCKER_IMAGE=$DOCKER_REGISTRY/confluentinc/gateway:dev-master-d1f36e72-ubi9.arm64
+docker compose up -d
+```

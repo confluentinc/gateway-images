@@ -65,6 +65,10 @@ VOLUME ["/var/lib/${COMPONENT}/data", "/etc/${COMPONENT}/secrets"]
 
 COPY --chown=appuser:appuser include/etc/confluent/docker /etc/confluent/docker
 
+# make executable
+RUN chmod +x /etc/confluent/docker/run
+RUN chmod +x /etc/confluent/docker/configure
+
 USER appuser
 
 CMD ["/etc/confluent/docker/run"]
