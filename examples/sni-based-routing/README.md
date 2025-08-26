@@ -59,7 +59,7 @@ docker exec -it kafka-1 /bin/bash
 From inside the kafka-1 container, run:
 ```bash
 kafka-console-producer \
-     --bootstrap-server broker1.kafka.gateway.local:19092 \
+     --bootstrap-server kafka.gateway.local:19092 \
      --topic test \
      --producer.config /etc/kafka/client.properties
 ```
@@ -75,7 +75,7 @@ docker exec -it kafka-1 /bin/bash
 Then run:
 ```bash
 kafka-console-consumer \
-     --bootstrap-server broker1.kafka.gateway.local:19092 \
+     --bootstrap-server kafka.gateway.local:19092 \
      --topic test \
      --consumer.config /etc/kafka/client.properties
 ```

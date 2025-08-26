@@ -48,6 +48,7 @@ services:
       confluent-local-network:
         aliases:
           - broker1.kafka.gateway.local
+          - kafka.gateway.local
     depends_on:
       - kafka-1
     volumes:
