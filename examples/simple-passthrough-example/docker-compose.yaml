@@ -4,8 +4,6 @@ services:
   kafka-1:
     image: confluentinc/cp-server:latest
     container_name: kafka-1
-    networks:
-      - confluent-local-network
     ports:
       - "33333:33333"  # External listener port (for clients outside Docker)
       - "44444:44444"  # Internal listener port (for internal communication)
@@ -38,16 +36,14 @@ services:
       KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
-# Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
-# kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
-# When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
-# Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
+ # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
+ # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
+ # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
+ # Passthrough route on Gateway is created for clients to connect to the kafka-1 brokers via the Gateway. Name of the route is passthrough-route.  
 
   gateway:
     image: "${GATEWAY_IMAGE}"
     container_name: gateway
-    networks:
-      - confluent-local-network
     depends_on:
       - kafka-1
     environment:
@@ -90,7 +86,3 @@ services:
         exec /etc/confluent/docker/run
       "
 
-# Define the shared network that all services will use
-networks:
-  confluent-local-network:
-    driver: bridge
