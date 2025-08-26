@@ -133,7 +133,7 @@ blocks:
         - name: Deploy AMD confluentinc/cpc-gateway ubi9
           env_vars:
             - name: DOCKER_IMAGE
-              value: confluentinc/gateway
+              value: confluentinc/cpc-gateway
           commands:
             - export OS_TAG="-ubi9"
             - export PROD_IMAGE_NAME=${DOCKER_PROD_REGISTRY}confluentinc/cpc-gateway
