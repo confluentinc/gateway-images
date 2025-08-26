@@ -42,7 +42,7 @@ services:
 
 
   gateway:
-    image: 519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/confluentinc/gateway:master-latest-ubi9
+    image: ${DOCKER_REGISTRY}confluentinc/cpc-gateway:${GATEWAY_VERSION:-latest}
     container_name: gateway
     networks:
       confluent-local-network:
