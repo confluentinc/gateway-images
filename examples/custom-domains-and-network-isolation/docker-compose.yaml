@@ -12,7 +12,7 @@ services:
       - "44444:44444"  # Internal listener port (for internal communication)
       - "9093:9093"    # Controller port (for controller communication)
     volumes:
-      - ${KAFKA_SERVER_JAAS_CONF}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
+      - ${KAFKA_SERVER_JAAS_CONF:-./kafka_server_jaas.conf}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -43,12 +43,12 @@ services:
  # partner-access-route route on Gateway is created for external clients to connect to the kafka-1 broker via the Gateway. Name of the route is partner-access-route. 
  # partner-access-route is associated with sample-domain. All the traffic addressed by partner-access-route will be forwarded to the sample-domain by the Gateway.
  # Passthrough authentication is enabled at Gateway for partner-access-route. When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication.Broker will perform authentication. 
- # Two seperate networks are defined for kafka and gateway. Kafka brokers are isolated in a private docker network. 
+ # Two separate networks are defined for kafka and gateway. Kafka brokers are isolated in a private docker network.
  # partner-access-route route is created with a custom domain name "my-custom-domain-name" and port 19092. This route is used by external clients to connect to the kafka-1 broker via the Gateway. Setting this custom domain name rather than using localhost requires setting up the host resolution in /etc/hosts file.
  # Port based routing is used for this route for simplicity of local experience. 
 
   gateway:
-    image: "${GATEWAY_IMAGE}"
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
     container_name: gateway
     # A separate network for the gateway container
     networks:
