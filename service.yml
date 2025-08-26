@@ -9,7 +9,7 @@ semaphore:
   enable: true
   pipeline_type: cp-dockerfile
   pipeline_enable: false
-  docker_repos: ["confluentinc/gateway",]
+  docker_repos: ["confluentinc/cpc-gateway",]
   maven_phase: 'package'
   maven_skip_deploy: true
   build_arm: true
@@ -58,7 +58,7 @@ semaphore:
 code_artifact:
   enable: true
   package_paths:
-    - maven-snapshots/maven/io.confluent/gateway-images
-    - maven-snapshots/maven/io.confluent/gateway-images-parent
-    - maven-snapshots/maven/io.confluent.gateway-images/gateway-images-parent
-    - maven-snapshots/maven/io.confluent.gateway-images/gateway
+    - maven-snapshots/maven/io.confluent/cpc-gateway-images
+    - maven-snapshots/maven/io.confluent/cpc-gateway-images-parent
+    - maven-snapshots/maven/io.confluent.cpc-gateway-images/cpc-gateway-images-parent
+    - maven-snapshots/maven/io.confluent.cpc-gateway-images/cpc-gateway

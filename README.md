@@ -40,6 +40,6 @@ export DOCKER_TAG=$DOCKER_DEV_TAG
 # Run Docker
 ```bash
 export DOCKER_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
-export GATEWAY_DOCKER_IMAGE=$DOCKER_REGISTRY/confluentinc/gateway:dev-master-d1f36e72-ubi9.arm64
+export GATEWAY_DOCKER_IMAGE=$DOCKER_REGISTRY/confluentinc/cpc-gateway:dev-master-d1f36e72-ubi9.arm64
 docker compose up -d
 ```
