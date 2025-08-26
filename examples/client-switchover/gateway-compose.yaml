@@ -9,7 +9,7 @@ services:
 # For simplicity, we are using port based routing, disabled encryption and ensured the client has same credentials for both the clusters. 
 
   gateway:
-    image: "${GATEWAY_IMAGE}"
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
     container_name: gateway
     external_links:
       - kafka-1
