@@ -12,10 +12,10 @@ gateway:
             endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
   routes:
     - name: sni-route
-      endpoint: "host.docker.internal:19092"
+      endpoint: "kafka.gateway.local:19092"
       brokerIdentificationStrategy:
         type: host
-        pattern: "broker$(nodeId).host.docker.internal"
+        pattern: "broker$(nodeId).kafka.gateway.local"
       streamingDomain:
         name: sample-domain
         bootstrapServerId: localkafka
