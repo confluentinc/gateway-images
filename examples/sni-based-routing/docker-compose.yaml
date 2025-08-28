@@ -1,0 +1,76 @@
+services:
+
+  kafka-1:
+    image: confluentinc/cp-server:latest
+    container_name: kafka-1
+    networks:
+      - confluent-local-network
+    ports:
+      - "33333:33333" # Port for clients outside Docker (e.g., from your host machine)
+      - "44444:44444"
+      - "9093:9093"
+    volumes:
+      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+      - ./client.properties:/etc/kafka/client.properties
+      - ./ssl/client.truststore.jks:/etc/kafka/client.truststore.jks
+      - ./ssl/client.keystore.jks:/etc/kafka/client.keystore.jks
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-1:9093'
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://0.0.0.0:33333,CONTROLLER://kafka-1:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://localhost:33333'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
+      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf'
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+  
+
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
+
+
+  gateway:
+    image: ${DOCKER_REGISTRY}confluentinc/cpc-gateway:${GATEWAY_VERSION:-latest}
+    container_name: gateway
+    networks:
+      confluent-local-network:
+        aliases:
+          - broker1.kafka.gateway.local
+          - kafka.gateway.local
+    depends_on:
+      - kafka-1
+    volumes:
+      - ./gateway.yaml:/etc/gateway/config.yaml
+      - ./ssl/gateway.truststore.jks:/etc/gateway/gateway.truststore.jks
+      - ./ssl/gateway.truststore.pwd:/etc/gateway/gateway.truststore.pwd
+      - ./ssl/gateway.keystore.jks:/etc/gateway/gateway.keystore.jks
+      - ./ssl/gateway.keystore.pwd:/etc/gateway/gateway.keystore.pwd
+      - ./ssl/gateway.key.pwd:/etc/gateway/gateway.key.pwd
+    environment:
+      GATEWAY_CONFIG_FILE: /etc/gateway/config.yaml
+    ports:
+      - "19092:19092"
+      - "19093:19093"
+      - "9190:9190"
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "
+
+# Define the shared network that all services will use
+networks:
+  confluent-local-network:
+    driver: bridge
