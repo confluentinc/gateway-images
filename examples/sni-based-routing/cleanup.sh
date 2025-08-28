@@ -9,7 +9,7 @@ echo "🧹 Cleaning up Gateway SNI-Based Routing setup..."
 
 # Stop and remove containers
 echo "🛑 Stopping services..."
-docker-compose down -v 2>/dev/null || true
+docker-compose down -v --remove-orphans 2>/dev/null || true
 
 # Remove SSL certificates
 echo "🗑️ Removing SSL certificates..."
