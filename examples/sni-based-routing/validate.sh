@@ -45,7 +45,7 @@ else
     echo "✅ /etc/hosts entry found"
 fi
 
-if ! grep -q "kafka.gateway.local" /etc/hosts 2>/dev/null; then
+if ! grep -q "kafka.gateway.local" /etc/hosts; then
     echo "⚠️ Missing /etc/hosts entry for kafka.gateway.local"
     echo "💡 Add this entry to /etc/hosts:"
     echo "127.0.0.1   kafka.gateway.local"
