@@ -17,13 +17,16 @@ mkdir -p "${SSL_DIR}"
 
 # Clean up existing certificates
 echo "🧹 Cleaning up existing certificates..."
-rm -f "${SSL_DIR}"/*.jks "${SSL_DIR}"/*.pwd "${SSL_DIR}"/*.key "${SSL_DIR}"/*.crt "${SSL_DIR}"/*.csr "${SSL_DIR}"/*.p12 "${SSL_DIR}"/*.ext "${SSL_DIR}"/*.srl
+patterns=( "*.jks" "*.pwd" "*.key" "*.crt" "*.csr" "*.p12" "*.ext" "*.srl" )
+for pattern in "${patterns[@]}"; do
+  rm -f "${SSL_DIR}/${pattern}"
+done
 
 # Make sure the SSL generation script is executable
 chmod +x "${SCRIPT_DIR}/generate-ssl.sh"
 
 echo "📜 Generating TLS artifacts under ${SSL_DIR}..."
-docker run --rm -u 0:0 \
+docker run --rm -u 1000:1000 \
   -v "${SSL_DIR}:/ssl" \
   -v "${SCRIPT_DIR}/generate-ssl.sh:/usr/local/bin/generate-ssl.sh" \
   -e STOREPASS="${STOREPASS}" \

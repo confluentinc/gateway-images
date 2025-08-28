@@ -9,13 +9,13 @@ echo "🔍 Validating Gateway SNI-Based Routing setup..."
 
 # Check if services are running
 echo "📋 Checking service status..."
-if ! docker ps | grep -q kafka-1; then
+if ! docker ps --filter name=kafka-1 --format '{{.Names}}' | grep -xq kafka-1; then
     echo "❌ Kafka service (kafka-1) is not running"
     echo "💡 Run './start.sh' to start the services"
     exit 1
 fi
 
-if ! docker ps | grep -q gateway; then
+if ! docker ps --filter name=gateway --format '{{.Names}}' | grep -xq gateway; then
     echo "❌ Gateway service is not running"
     echo "💡 Run './start.sh' to start the services"
     exit 1
