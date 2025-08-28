@@ -14,6 +14,8 @@ The Gateway routes traffic based on the hostname in the TLS handshake, enabling 
 ## Available Scripts
 
 - **`./start.sh`** - Set up the environment with SSL certificates and start services
+- **`./generate-ssl.sh`** - Standalone SSL certificate generation script (used by start.sh)
+- **`./add-hosts.sh`** - Helper to add required /etc/hosts entries (requires sudo)
 - **`./validate.sh`** - Validate the setup and test connectivity
 - **`./cleanup.sh`** - Clean up all resources and stop services
 
@@ -26,14 +28,20 @@ The Gateway routes traffic based on the hostname in the TLS handshake, enabling 
 
 ### 1. Update /etc/hosts
 
-Add the following entry to your `/etc/hosts` file:
+**Option A: Use the helper script (recommended)**
+```bash
+sudo chmod +x ./add-hosts.sh
+sudo ./add-hosts.sh
+```
 
+**Option B: Manual setup**
+Add the following entries to your `/etc/hosts` file:
 ```bash
 sudo vi /etc/hosts
 ```
+Add this line:
 ```
-127.0.0.1   kafka.gateway.local
-127.0.0.1   broker1.kafka.gateway.local
+127.0.0.1   kafka.gateway.local broker1.kafka.gateway.local
 ```
 
 ### 2. Start the Services
