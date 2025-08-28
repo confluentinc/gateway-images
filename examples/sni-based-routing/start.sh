@@ -37,7 +37,7 @@ docker run --rm -u 1000:1000 \
 cd "${SCRIPT_DIR}"
 
 echo "🐳 Starting Kafka and Gateway services..."
-docker-compose up --no-recreate -d kafka-1 gateway
+docker-compose up -d kafka-1 gateway
 
 echo ""
 echo "🎉 SNI-Based Routing setup completed successfully!"
