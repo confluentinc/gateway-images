@@ -3,3 +3,7 @@ target/
 maven-settings.xml
 *.iml
 examples/*/ssl
+compatibility-results/
+__pycache__/
+.venv/
+venv/
