@@ -223,68 +223,6 @@ main() {
     generate_final_report
 }
 
-# Create docker-compose template
-cat > docker-compose.test.yml << 'EOF'
-services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:${KAFKA_SERVER_VERSION}
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-
-  kafka-server:
-    image: confluentinc/cp-server:${KAFKA_SERVER_VERSION}
-    depends_on: [zookeeper]
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:9092
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
-
-  gateway:
-    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
-    depends_on: [kafka-server]
-    ports:
-      - "19092:19092"
-      - "19093:19093"
-      - "9190:9190"
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka-server:9092
-      GATEWAY_CONFIG: |
-          gateway:
-            name: "vct-gateway"
-            streamingDomains:
-              - name: "vct-domain"
-                kafkaCluster:
-                  name: "vct-cluster"
-                  bootstrapServers:
-                    - endpoint: "kafka-server:9092"
-                      id: plaintext
-                  nodeIdRanges:
-                    - name: "default"
-                      start: 0
-                      end: 1
-            routes:
-              - name: "vct-route"
-                endpoint: "gateway:19092"
-                brokerIdentificationStrategy:
-                  type: port
-                streamingDomain:
-                  name: "vct-domain"
-                  bootstrapServerId: "plaintext"
-                security:
-                  auth: "passthrough"
-            admin:
-              endpoints:
-                metrics: true
-            advanced:
-              useIoUring: false
-  kafka-client-test:
-    image: confluentinc/cp-server:${KAFKA_CLIENT_VERSION}
-    depends_on: [gateway]
-    container_name: kafka-client-test
-    command: sleep infinity
-EOF
-
 # Usage
 case "$1" in
     "--run")
