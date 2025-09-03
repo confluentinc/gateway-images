@@ -76,6 +76,7 @@ KAFKA_API_KEYS = {
     'push_telemetry': 72,
     'assign_replicas_to_dirs': 73,
     'list_client_metrics_resources': 74,
+    'describe_topic_partitions': 75,
 }
 
 def get_api_key_int(api_name):

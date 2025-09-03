@@ -137,24 +137,8 @@ class EnhancedKroxyliciousMetricsParser:
             else:
                 print(f"  Skipping {metrics_file} - not a test metrics file")
 
-    def generate_report(self, output_dir):
-        """Generate comprehensive compatibility report"""
-        print(f"\nGenerating reports in: {output_dir}")
-        
-        if not self.results:
-            print("No results to process!")
-            return
-
-        # 1. Detailed CSV with integer API keys
-        csv_file = os.path.join(output_dir, "detailed_api_usage.csv")
-        with open(csv_file, 'w', newline='') as f:
-            fieldnames = ['api_key', 'api_key_int', 'api_version', 'client_version', 'server_version', 
-                         'request_count', 'client_errors', 'upstream_errors', 'status', 'test_name', 'timestamp']
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(self.results)
-
-        # 2. Summary by combination
+    def _build_matrix_data(self):
+        """Build matrix data structure from results"""
         matrix = defaultdict(lambda: {
             'apis': set(),
             'api_ints': set(),
@@ -179,8 +163,22 @@ class EnhancedKroxyliciousMetricsParser:
                 matrix[key]['successful_apis'].add(f"{result['api_key']}({result['api_key_int']})")
             elif result['status'] == 'ERROR':
                 matrix[key]['failed_apis'].add(f"{result['api_key']}({result['api_key_int']})")
+        
+        return matrix
 
-        # 3. Summary table
+    def _generate_detailed_csv(self, output_dir):
+        """Generate detailed CSV report"""
+        csv_file = os.path.join(output_dir, "detailed_api_usage.csv")
+        with open(csv_file, 'w', newline='') as f:
+            fieldnames = ['api_key', 'api_key_int', 'api_version', 'client_version', 'server_version', 
+                         'request_count', 'client_errors', 'upstream_errors', 'status', 'test_name', 'timestamp']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(self.results)
+        return csv_file
+
+    def _generate_summary_table(self, output_dir, matrix):
+        """Generate summary table report"""
         summary_file = os.path.join(output_dir, "compatibility_summary.txt")
         with open(summary_file, 'w') as f:
             f.write("KAFKA CLIENT COMPATIBILITY TEST RESULTS\n")
@@ -204,8 +202,10 @@ class EnhancedKroxyliciousMetricsParser:
                     status = "⚠️ NO_DATA"
 
                 f.write(f"{client_ver:<8} | {server_ver:<8} | {successful_apis:<30} | {failed_apis:<20} | {requests:<8} | {int(total_errors):<8} | {status}\n")
+        return summary_file
 
-        # 4. API Key Reference
+    def _generate_api_reference(self, output_dir):
+        """Generate API key reference file"""
         api_ref_file = os.path.join(output_dir, "api_key_reference.txt")
         with open(api_ref_file, 'w') as f:
             f.write("KAFKA API KEY REFERENCE\n")
@@ -220,8 +220,10 @@ class EnhancedKroxyliciousMetricsParser:
             
             for api_name, api_int in sorted(used_apis, key=lambda x: x[1] if isinstance(x[1], int) else 999):
                 f.write(f"{api_name:<30} | {api_int:<8}\n")
+        return api_ref_file
 
-        # 5. JSON report
+    def _generate_json_report(self, output_dir, matrix):
+        """Generate JSON report"""
         json_file = os.path.join(output_dir, "compatibility_report.json")
         with open(json_file, 'w') as f:
             json.dump({
@@ -233,6 +235,24 @@ class EnhancedKroxyliciousMetricsParser:
                                       'failed_apis': list(v['failed_apis'])} for k, v in matrix.items()},
                 'api_key_mapping': KAFKA_API_KEYS
             }, f, indent=2, default=str)
+        return json_file
+
+    def generate_report(self, output_dir):
+        """Generate comprehensive compatibility report"""
+        print(f"\nGenerating reports in: {output_dir}")
+        
+        if not self.results:
+            print("No results to process!")
+            return
+
+        # Build matrix data from results
+        matrix = self._build_matrix_data()
+
+        # Generate all report files
+        csv_file = self._generate_detailed_csv(output_dir)
+        summary_file = self._generate_summary_table(output_dir, matrix)
+        api_ref_file = self._generate_api_reference(output_dir)
+        json_file = self._generate_json_report(output_dir, matrix)
 
         print(f"\nReports generated:")
         print(f"  📊 Summary: {summary_file}")

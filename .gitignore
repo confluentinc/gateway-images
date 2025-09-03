@@ -4,3 +4,5 @@ maven-settings.xml
 *.iml
 compatibility-results/
 __pycache__/
+.venv/
+venv/
