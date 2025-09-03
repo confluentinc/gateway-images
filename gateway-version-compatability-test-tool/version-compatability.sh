@@ -41,8 +41,8 @@ run_compatibility_test() {
     docker-compose -f docker-compose.yml up -d
     
     # Wait for startup
-    echo "Waiting for services to stabilize...(20s)"
-    sleep 20
+    echo "Waiting for services to stabilize...(10s)"
+    sleep 10
     
     # Reset metrics baseline (restart gateway to clear counters)
     # docker-compose -f docker-compose.yml restart gateway
@@ -58,11 +58,14 @@ run_compatibility_test() {
     echo "Running API tests..."
     
     # Test 1: API Versions
+    echo "=== API Versions Test ==="
     docker exec kafka-client-test kafka-broker-api-versions \
-        --bootstrap-server gateway:19092 2>/dev/null || true
+        --bootstrap-server gateway:19092 || true
+    echo ""
     
     # Test 2: Topic operations
     # topic replace . with _
+    echo "=== Topic Create Test ==="
     TEST_TOPIC="version-compatibility-test-${test_id//./-}"
     echo "Creating topic: $TEST_TOPIC"
     docker exec kafka-client-test kafka-topics \
@@ -70,19 +73,42 @@ run_compatibility_test() {
         --create --topic $TEST_TOPIC --partitions 1 2>/dev/null || true
     
     # Test 3: Producer
+    echo "=== Producer Test ==="
+    echo "Sending message: test-message-$test_id"
     echo "test-message-$test_id" | docker exec -i kafka-client-test \
         kafka-console-producer \
         --bootstrap-server gateway:19092 \
-        --topic $TEST_TOPIC 2>/dev/null || true
+        --topic $TEST_TOPIC \
+        --property parse.key=false \
+        --property key.separator=: || {
+        echo "❌ Producer failed"
+        return 1
+    }
+
+    echo "✅ Message sent successfully"
+
+    echo "=== Topic Verification ==="
+    docker exec kafka-client-test kafka-run-class kafka.tools.GetOffsetShell \
+        --broker-list gateway:19092 \
+        --topic $TEST_TOPIC --time -1 || true
     
     # Test 4: Consumer
-    timeout 5 docker exec kafka-client-test kafka-console-consumer \
+    echo "=== Consumer Test ==="
+    echo "Reading messages from topic: $TEST_TOPIC"
+    timeout 10 docker exec kafka-client-test kafka-console-consumer \
         --bootstrap-server gateway:19092 \
-        --topic $TEST_TOPIC --from-beginning 2>/dev/null || true
+        --from-beginning \
+        --topic $TEST_TOPIC \
+        --max-messages 1 \
+        --timeout-ms 8000 || true
+    echo ""
+    echo "Ignore FetchSessionHandler. It is not harmful."
     
     # Test 5: Consumer groups
+    echo "=== Consumer Groups Test ==="
     docker exec kafka-client-test kafka-consumer-groups \
-        --bootstrap-server gateway:19092 --list 2>/dev/null || true
+        --bootstrap-server gateway:19092 --list || true
+    echo ""
     
     # Scrape metrics
     sleep 10
@@ -103,6 +129,11 @@ parse_metrics_to_csv() {
     local client_ver=$2
     local server_ver=$3
     local test_id=$4
+
+    # write header if file doesn't exist
+    if [ ! -f "$RESULTS_DIR/raw_results.csv" ]; then
+        echo "API_KEY,API_VERSION,CLIENT_VERSION,SERVER_VERSION,REQUEST_COUNT,CLIENT_ERRORS,UPSTREAM_ERRORS,STATUS" > "$RESULTS_DIR/raw_results.csv"
+    fi
     
     # Extract API request data
     grep "kroxylicious_client_to_proxy_request_total" $metrics_file | \
