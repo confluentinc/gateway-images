@@ -2,3 +2,5 @@ target/
 .idea/
 maven-settings.xml
 *.iml
+compatibility-results/
+__pycache__/
