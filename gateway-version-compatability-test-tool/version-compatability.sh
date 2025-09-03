@@ -38,19 +38,19 @@ run_compatibility_test() {
     echo "Using Kafka Client Image: $KAFKA_CLIENT_VERSION"
     echo "Using Kafka Server Image: $KAFKA_SERVER_VERSION"
     # Start environment
-    docker-compose -f docker-compose.test.yml up -d
+    docker-compose -f docker-compose.yml up -d
     
     # Wait for startup
     echo "Waiting for services to stabilize...(20s)"
     sleep 20
     
     # Reset metrics baseline (restart gateway to clear counters)
-    # docker-compose -f docker-compose.test.yml restart gateway
+    # docker-compose -f docker-compose.yml restart gateway
     # sleep 10
     # if gateway is not up, exit
     if ! curl -s $GATEWAY_METRICS > /dev/null; then
         echo "Gateway not responding. Exiting test."
-        docker-compose -f docker-compose.test.yml down
+        docker-compose -f docker-compose.yml down
         return
     fi
     
@@ -92,7 +92,7 @@ run_compatibility_test() {
     parse_metrics_to_csv "$RESULTS_DIR/${test_id}_metrics.txt" $client_ver $server_ver $test_id
     
     # Cleanup
-    docker-compose -f docker-compose.test.yml down
+    docker-compose -f docker-compose.yml down
     
     echo "Completed: $test_id"
 }
