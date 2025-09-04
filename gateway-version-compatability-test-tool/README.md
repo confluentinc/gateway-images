@@ -8,7 +8,7 @@ This tool tests compatibility between different Kafka client and server versions
 
 ## Features
 
-- **🔍 Version Matrix Testing**: Tests 16 combinations (4 client × 4 server versions)
+- **🔍 Version Matrix Testing**: Tests all combinations (m client × n server versions)
 - **📊 API Analysis**: Shows API keys as both names AND integers for protocol debugging
 - **🐍 Zero-Setup Python**: Automatic virtual environment and dependency management
 - **📈 Multiple Report Formats**: CSV, JSON, and human-readable summaries
@@ -172,18 +172,8 @@ gateway-version-compatability-test-tool/
 ### Adding New Versions
 Update the version arrays in `version-compatability.sh`:
 ```bash
-CLIENTS=("7.4" "7.6" "7.8" "8.0" "8.2")
-SERVERS=("7.4" "7.6" "7.8" "8.0" "8.2")
-```
-
-And add the corresponding Docker image mapping:
-```bash
-get_image() {
-    case "$version" in
-        "4.2") echo "8.2.0" ;;
-        # ... existing mappings
-    esac
-}
+CLIENTS=("7.9.0" "8.1.0")
+SERVERS=("7.9.0" "8.1.0")
 ```
 
 ## Contributing

@@ -4,11 +4,11 @@
 
 GATEWAY_METRICS="http://localhost:9190/metrics"
 RESULTS_DIR="compatibility-results/$(date +%Y%m%d_%H%M%S)"
-mkdir -p $RESULTS_DIR
+mkdir -p "$RESULTS_DIR"
 
 # Simplified matrix - Java clients only
-CLIENTS=("7.4.0" "7.6.0" "7.8.0" "8.0.0")
-SERVERS=("7.4.0" "7.6.0" "7.8.0" "8.0.0")
+CLIENTS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
+SERVERS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
 
 # =============================================================================
 # PYTHON ENVIRONMENT SETUP
@@ -82,7 +82,7 @@ run_compatibility_test() {
     # docker-compose -f docker-compose.yml restart gateway
     # sleep 10
     echo "Checking service availability..."
-    if ! curl -s $GATEWAY_METRICS > /dev/null; then
+    if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
         echo "Gateway not responding. Exiting test."
         docker-compose -f docker-compose.yml down
         return
@@ -153,7 +153,7 @@ run_compatibility_test() {
     
     # Scrape metrics
     sleep 10
-    curl -s $GATEWAY_METRICS > "$RESULTS_DIR/${test_id}_metrics.txt"
+    curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
     
     # Cleanup
     docker-compose -f docker-compose.yml down
