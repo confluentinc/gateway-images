@@ -127,11 +127,6 @@ run_compatibility_test() {
     }
 
     echo "✅ Message sent successfully"
-
-    echo "=== Topic Verification ==="
-    docker exec kafka-client-test kafka-run-class kafka.tools.GetOffsetShell \
-        --broker-list gateway:19092 \
-        --topic $TEST_TOPIC --time -1 || true
     
     # Test 4: Consumer
     echo "=== Consumer Test ==="
