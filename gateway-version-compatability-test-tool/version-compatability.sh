@@ -7,8 +7,8 @@ RESULTS_DIR="compatibility-results/$(date +%Y%m%d_%H%M%S)"
 mkdir -p $RESULTS_DIR
 
 # Simplified matrix - Java clients only
-CLIENTS=("3.4" "3.6" "3.8" "4.0")
-SERVERS=("3.4" "3.6" "3.8" "4.0")
+CLIENTS=("7.4.0" "7.6.0" "7.8.0" "8.0.0")
+SERVERS=("7.4.0" "7.6.0" "7.8.0" "8.0.0")
 
 # =============================================================================
 # PYTHON ENVIRONMENT SETUP
@@ -47,18 +47,9 @@ setup_python_env() {
     echo "✅ Python environment ready"
 }
 
-get_image() {
-    local version="$1"
-    case "$version" in
-        "3.4") echo "7.4.0" ;;
-        "3.6") echo "7.6.0" ;;
-        "3.8") echo "7.8.0" ;;
-        "4.0") echo "8.0.0" ;;
-        *) echo "latest" ;;
-    esac
+version_ge() {  # $1 >= $2 ?
+    [ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
 }
-
-
 # Function to run test and capture metrics
 run_compatibility_test() {
     local client_ver=$1
@@ -70,12 +61,18 @@ run_compatibility_test() {
     echo "----------------------------------------"
 
     # print images being used
-    export KAFKA_CLIENT_VERSION="$(get_image "$client_ver")"
-    export KAFKA_SERVER_VERSION="$(get_image "$server_ver")"
+    export KAFKA_CLIENT_VERSION="$client_ver"
+    export KAFKA_SERVER_VERSION="$server_ver"
     echo "Using Kafka Client Image: $KAFKA_CLIENT_VERSION"
     echo "Using Kafka Server Image: $KAFKA_SERVER_VERSION"
     # Start environment
-    docker-compose -f docker-compose.yml up -d
+    # if kafka_server_version starts after 8.0.0, use KRaft mode: docker-compose-kraft.yml
+    if version_ge $server_ver "8.0.0"; then
+        echo "Starting Kafka in KRaft mode..."
+        docker-compose -f docker-compose-kraft.yml up -d
+    else
+        docker-compose -f docker-compose.yml up -d
+    fi
     
     # Wait for startup
     echo "Waiting for services to stabilize...(10s)"
@@ -84,9 +81,16 @@ run_compatibility_test() {
     # Reset metrics baseline (restart gateway to clear counters)
     # docker-compose -f docker-compose.yml restart gateway
     # sleep 10
-    # if gateway is not up, exit
+    echo "Checking service availability..."
     if ! curl -s $GATEWAY_METRICS > /dev/null; then
         echo "Gateway not responding. Exiting test."
+        docker-compose -f docker-compose.yml down
+        return
+    fi
+
+    # if kafka is not up, exit
+    if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
+        echo "Kafka server not responding. Exiting test."
         docker-compose -f docker-compose.yml down
         return
     fi
@@ -254,7 +258,7 @@ case "$1" in
     *)
         echo "Usage:"
         echo "  $0 --run                    # Run all 16 test combinations"
-        echo "  $0 --single 3.6 3.8        # Test single combination"
+        echo "  $0 --single 7.6.0 7.8.0     # Test single combination"
         echo "  $0 --parse results_dir      # Parse existing results"
         echo "  $0 --setup-env              # Set up Python environment only"
         echo ""

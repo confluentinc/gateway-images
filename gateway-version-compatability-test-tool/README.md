@@ -35,7 +35,7 @@ cd gateway-version-compatability-test-tool
 ./version-compatability.sh --run
 
 # Or test a single combination
-./version-compatability.sh --single 3.6 3.8
+./version-compatability.sh --single 7.6.0 7.8.0
 ```
 
 ## Usage Options
@@ -54,20 +54,11 @@ cd gateway-version-compatability-test-tool
 ./version-compatability.sh --run
 
 # Test specific versions
-./version-compatability.sh --single 3.8 4.0
+./version-compatability.sh --single 7.8.0 8.0.0
 
 # Parse existing results
 ./version-compatability.sh --parse compatibility-results/20240903_090000
 ```
-
-## Supported Versions
-
-| Client Version | Server Version | Docker Image |
-|----------------|----------------|--------------|
-| 3.4 | 3.4 | confluentinc/cp-server:7.4.0 |
-| 3.6 | 3.6 | confluentinc/cp-server:7.6.0 |
-| 3.8 | 3.8 | confluentinc/cp-server:7.8.0 |
-| 4.0 | 4.0 | confluentinc/cp-server:8.0.0 |
 
 ## Test Workflow
 
@@ -89,15 +80,15 @@ After running tests, you'll find these files in `compatibility-results/TIMESTAMP
 Human-readable summary with pass/fail status:
 ```
 CLIENT   | SERVER   | SUCCESSFUL_APIS              | FAILED_APIS    | REQUESTS | ERRORS   | STATUS
-3.6      | 3.8      | metadata(3),fetch(1)         |                | 45       | 0        | ✅ PASS
+7.6      | 7.8      | metadata(3),fetch(1)         |                | 45       | 0        | ✅ PASS
 ```
 
 ### 📋 detailed_api_usage.csv
 Complete API usage data with integer mappings:
 ```csv
 api_key,api_key_int,api_version,client_version,server_version,request_count,status
-fetch,1,11,3.6,3.8,12,SUCCESS
-metadata,3,9,3.6,3.8,8,SUCCESS
+fetch,1,11,7.6,7.8,12,SUCCESS
+metadata,3,9,7.6,7.8,8,SUCCESS
 ```
 
 ### 📖 api_key_reference.txt
@@ -181,8 +172,8 @@ gateway-version-compatability-test-tool/
 ### Adding New Versions
 Update the version arrays in `version-compatability.sh`:
 ```bash
-CLIENTS=("3.4" "3.6" "3.8" "4.0" "4.2")
-SERVERS=("3.4" "3.6" "3.8" "4.0" "4.2")
+CLIENTS=("7.4" "7.6" "7.8" "8.0" "8.2")
+SERVERS=("7.4" "7.6" "7.8" "8.0" "8.2")
 ```
 
 And add the corresponding Docker image mapping:
