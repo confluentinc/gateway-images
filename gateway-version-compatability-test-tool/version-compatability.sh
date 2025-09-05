@@ -147,7 +147,7 @@ run_compatibility_test() {
     echo ""
     
     # Scrape metrics
-    sleep 10
+    sleep 5
     curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
     
     # Cleanup
@@ -201,6 +201,9 @@ main() {
     
     local test_count=0
     local total_tests=16
+
+    # start timer
+    CURRENT_TIME=$(date +%s)
     
     # Run all combinations
     for client_ver in "${CLIENTS[@]}"; do
@@ -213,6 +216,12 @@ main() {
             sleep 3
         done
     done
+
+    # end timer
+    END_TIME=$(date +%s)
+    ELAPSED_TIME=$((END_TIME - CURRENT_TIME))
+    echo ""
+    echo "Total testing time: $ELAPSED_TIME seconds"
     
     # Generate final reports
     generate_final_report
