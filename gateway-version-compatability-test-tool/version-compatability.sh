@@ -194,13 +194,16 @@ generate_final_report() {
 
 # Main execution
 main() {
+    client_count=${#CLIENTS[@]}
+    server_count=${#SERVERS[@]}
+    total_combinations=$((client_count * server_count))
     echo "KAFKA CLIENT COMPATIBILITY TESTING"
-    echo "Matrix: 16 combinations (4 Java clients × 4 servers)" 
+    echo "Matrix: $client_count Java client versions × $server_count server versions = $total_combinations combinations"
     echo "Results: $RESULTS_DIR"
     echo ""
     
     local test_count=0
-    local total_tests=16
+    local total_tests=$total_combinations
 
     # start timer
     CURRENT_TIME=$(date +%s)

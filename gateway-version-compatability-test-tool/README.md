@@ -42,7 +42,7 @@ cd gateway-version-compatability-test-tool
 
 | Command | Description |
 |---------|-------------|
-| `--run` | Run all 16 test combinations |
+| `--run` | Run all test combinations |
 | `--single <client> <server>` | Test single client-server combination |
 | `--parse <results_dir>` | Re-parse existing results |
 | `--setup-env` | Set up Python environment only |
