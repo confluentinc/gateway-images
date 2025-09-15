@@ -45,7 +45,7 @@ services:
                     endpoint: "kafka-2:22222" 
           routes:
             - name: switchover-route
-              endpoint: "host.docker.internal:19092" 
+              endpoint: "localhost:19092" 
               brokerIdentificationStrategy:
                 type: port 
               streamingDomain:
