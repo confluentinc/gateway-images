@@ -51,7 +51,7 @@ In this setup:
 
 - Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
 - kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
-- This Gateway exposes one route called auth-swap-route. This route endpoint is running at host.docker.internal:19092. 
+- This Gateway exposes one route called auth-swap-route. This route endpoint is running at localhost:19092. 
 - Clients stream data to Kafka-1 brokers via this route. Authentication swapping is enabled for this route.
 - When authentication swapping is enabled, Gateway will authenticate the incoming client and post successful authentication, it will extract the principal of the incoming client and use it to fetch the swapped credentials from the secret store.
 - Gateway forwards the request to the kafka-1 broker using the swapped credentials. Broker will perform authentication using the swapped credentials.
@@ -98,7 +98,7 @@ gateway:
                     endpoint: "kafka-1:44444" 
           routes:
             - name: auth-swap-route
-              endpoint: "host.docker.internal:19092" 
+              endpoint: "localhost:19092" 
               brokerIdentificationStrategy:
                 type: port 
               streamingDomain:
