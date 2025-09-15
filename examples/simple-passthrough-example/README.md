@@ -30,7 +30,7 @@ GATEWAY_CONFIG: |
                     endpoint: "kafka-1:44444" 
           routes:
             - name: passthrough-route
-              endpoint: "host.docker.internal:19092" 
+              endpoint: "localhost:19092" 
               brokerIdentificationStrategy:
                 type: port 
               streamingDomain:
