@@ -148,3 +148,9 @@ blocks:
                   docker manifest create $DOCKER_REPO:latest-$OS_TYPE $DOCKER_REPO:latest-$OS_TYPE$AMD_ARCH $DOCKER_REPO:latest-$OS_TYPE$ARM_ARCH
                   docker manifest push $DOCKER_REPO:latest-$OS_TYPE
               fi
+
+promotions:
+  - name: version-compatibility-tests
+    pipeline_file: version-compatibility-tests.yml
+    auto_promote:
+      when: "result = 'passed'"
