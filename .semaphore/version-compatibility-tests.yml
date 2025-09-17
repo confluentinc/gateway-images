@@ -21,7 +21,7 @@ global_job_config:
       - export S3_FOLDER="version-testing-results"
       - export GW_VERSION="${GATEWAY_VERSION:-1.0.0}"
       - export RESULTS_S3_PATH="s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/${RESULTS_TIMESTAMP}"
-      - echo "Test results will be uploaded to: ${RESULTS_S3_PATH}"
+      - echo "Test results will be uploaded to - ${RESULTS_S3_PATH}"
       - sem-version python 3.12
       - sem-version docker 24
 
