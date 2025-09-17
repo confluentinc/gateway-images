@@ -11,12 +11,6 @@ agent:
 execution_time_limit:
   hours: 2
 
-# Schedule to run every Monday at 21:00 UTC
-scheduler:
-  rules:
-    - if: "branch = 'master'"
-      when: "0 21 * * 1"  # Monday at 21:00 UTC (cron format: min hour day month weekday)
-
 global_job_config:
   prologue:
     commands:
