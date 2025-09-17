@@ -23,7 +23,6 @@ global_job_config:
       - export RESULTS_S3_PATH="s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/${RESULTS_TIMESTAMP}"
       - echo "Test results will be uploaded to - ${RESULTS_S3_PATH}"
       - sem-version python 3.12
-      - sem-version docker 24
 
 blocks:
   - name: Version Compatibility Tests
@@ -34,13 +33,6 @@ blocks:
           commands:
             # Navigate to the test tool directory
             - cd gateway-version-compatibility-test-tool
-            
-            # Install Docker Compose if not available
-            - |
-              if ! command -v docker-compose &> /dev/null; then
-                curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-                chmod +x /usr/local/bin/docker-compose
-              fi
             
             # Setup Python environment for metrics parsing
             - ./version-compatibility.sh --setup-env
@@ -216,6 +208,6 @@ blocks:
           commands:
             - echo "Cleaning up Docker containers and images..."
             - cd gateway-version-compatibility-test-tool
-            - docker-compose -f docker-compose.yml down -v || true
-            - docker-compose -f docker-compose-kraft.yml down -v || true
+            - docker compose -f docker-compose.yml down -v || true
+            - docker compose -f docker-compose-kraft.yml down -v || true
             - docker system prune -f || true
