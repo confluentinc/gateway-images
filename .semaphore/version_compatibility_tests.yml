@@ -1,0 +1,232 @@
+# Version Compatibility Tests Pipeline
+# This pipeline runs on a scheduled basis (Monday at 21:00 UTC)
+# It executes compatibility tests and publishes results to S3 with Slack notifications
+
+version: v1.0
+name: version-compatibility-tests
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-amd64-1
+
+execution_time_limit:
+  hours: 2
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - . vault-setup
+      - . vault-sem-get-secret v1/ci/kv/cpc-gateway/slack-webhook-tests-notifications
+      - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
+      - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
+      - export S3_BUCKET="gateway-results"
+      - export S3_FOLDER="version-testing-results"
+      - export GW_VERSION="${GATEWAY_VERSION:-1.0.0}"
+      - export RESULTS_S3_PATH="s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/${RESULTS_TIMESTAMP}"
+      - echo "Test results will be uploaded to - ${RESULTS_S3_PATH}"
+      - sem-version python 3.12
+
+blocks:
+  - name: Version Compatibility Tests
+    dependencies: []
+    task:
+      jobs:
+        - name: Run Gateway Version Compatibility Tests
+          commands:
+            # Navigate to the test tool directory
+            - cd gateway-version-compatibility-test-tool
+            
+            # Setup Python environment for metrics parsing
+            - ./version-compatibility.sh --setup-env
+            
+            # Run the compatibility tests
+            - echo "Starting version compatibility tests..."
+            - |
+              if [ -n "${KAFKA_SERVER_VERSION}" ] && [ -n "${KAFKA_CLIENT_VERSION}" ]; then
+                  echo "Running single test for Gateway ${GW_VERSION} with Kafka Broker ${KAFKA_SERVER_VERSION} and Client ${KAFKA_CLIENT_VERSION}"
+                  ./version-compatibility.sh --single "${KAFKA_SERVER_VERSION}" "${KAFKA_CLIENT_VERSION}" || TEST_FAILED=true
+              else
+                  ./version-compatibility.sh --run || TEST_FAILED=true
+              fi
+            # Collect results regardless of test outcome
+            - echo "Collecting test results..."
+            - |
+              if [ -d "compatibility-results" ] && [ "$(ls -A compatibility-results/)" ]; then
+                export LATEST_RESULTS_DIR=$(ls -t compatibility-results/ | head -n1)
+                echo "Latest results directory: compatibility-results/${LATEST_RESULTS_DIR}"
+              else
+                echo "⚠️ No results directory found or directory is empty"
+                export LATEST_RESULTS_DIR=""
+              fi
+            
+            # Create summary for Slack notification
+            - |
+              clean_number() {
+                  local value=$(echo "$1" | tr -d '\n\r' | xargs | grep -o '[0-9]*' | head -n1)
+                  echo "${value:-0}"
+              }
+              if [ -n "${LATEST_RESULTS_DIR}" ] && [ -d "compatibility-results/${LATEST_RESULTS_DIR}" ]; then
+                echo "Creating test summary..."
+                
+                # Count total tests and analyze results
+                TOTAL_TESTS=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_metrics.txt" | wc -l)
+                FAILED_TESTS=0
+                PASSED_TESTS=0
+                
+                if [ -f "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" ]; then
+                  # Count failed tests
+                  FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
+                  # Count passed tests
+                  PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
+                  
+                  # print raw counts for debugging
+                  echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}"
+                  
+                  # clean numbers
+                  FAILED_TESTS=$(clean_number "${FAILED_TESTS}")
+                  PASSED_TESTS=$(clean_number "${PASSED_TESTS}")
+                  TOTAL_TESTS=$(clean_number "${TOTAL_TESTS}")
+                  
+                  # If we have a mismatch, calculate passed from total
+                  if [ $((PASSED_TESTS + FAILED_TESTS)) -ne ${TOTAL_TESTS} ] && [ ${TOTAL_TESTS} -gt 0 ]; then
+                    PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS))
+                  fi
+                else
+                  # Fallback calculation if summary doesn't exist
+                  PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS))
+                fi
+                
+                # Calculate success rate safely
+                if [ ${TOTAL_TESTS} -gt 0 ]; then
+                  SUCCESS_RATE=$(( (PASSED_TESTS * 100) / TOTAL_TESTS ))
+                else
+                  SUCCESS_RATE=0
+                fi
+                
+                # Create test summary file
+                cat > test_summary.txt << EOF
+              Gateway Version Compatibility Test Results
+              ==========================================
+              Gateway Version: ${GW_VERSION}
+              Timestamp: ${RESULTS_TIMESTAMP}
+              Total Test Combinations: ${TOTAL_TESTS}
+              Passed: ${PASSED_TESTS}
+              Failed: ${FAILED_TESTS}
+              Success Rate: ${SUCCESS_RATE}%
+              Results Location: ${RESULTS_S3_PATH}
+              
+              Generated Files:
+              - compatibility_summary.txt: Human-readable summary
+              - detailed_api_usage.csv: Complete API usage data
+              - compatibility_report.json: Machine-readable results
+              - api_key_reference.txt: API name to integer mappings
+              - <client>_<server>_metrics.txt: Raw Prometheus metrics per test
+              EOF
+                
+                echo "Test Summary:"
+                echo "" >> test_summary.txt
+                cat "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" >> test_summary.txt
+              else
+                echo "No results directory found!"
+                echo "Test execution may have failed completely" > test_summary.txt
+              fi
+            
+            # Upload results to S3
+            - echo "Uploading results to S3..."
+            - |
+              if [ -n "${LATEST_RESULTS_DIR}" ] && [ -d "compatibility-results/${LATEST_RESULTS_DIR}" ]; then
+                echo "📁 Uploading test results from compatibility-results/${LATEST_RESULTS_DIR}/"
+                
+                # List files being uploaded
+                echo "Files to upload:"
+                ls -la compatibility-results/${LATEST_RESULTS_DIR}/
+                
+                # Upload all test results
+                aws s3 cp compatibility-results/${LATEST_RESULTS_DIR}/ ${RESULTS_S3_PATH}/ --recursive
+                echo "✅ Results uploaded to ${RESULTS_S3_PATH}"
+                
+                # Upload test summary to a standard location for easy access
+                if [ -f "test_summary.txt" ]; then
+                  aws s3 cp test_summary.txt s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/latest_summary.txt
+                  echo "✅ Summary uploaded to s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/latest_summary.txt"
+                fi
+                
+                # Create an index of all test runs for this version
+                echo "Updating test run index..."
+                echo "${RESULTS_TIMESTAMP}" | aws s3 cp - s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/test_runs/${RESULTS_TIMESTAMP}.marker
+                
+              else
+                echo "❌ No results to upload - test execution may have failed completely"
+                
+                # Still upload failure marker and any available summary
+                if [ -f "test_summary.txt" ]; then
+                  aws s3 cp test_summary.txt s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/failed_run_${RESULTS_TIMESTAMP}.txt
+                else
+                  echo "Test execution failed - no results generated at $(date)" | aws s3 cp - s3://${S3_BUCKET}/${S3_FOLDER}/${GW_VERSION}/failed_run_${RESULTS_TIMESTAMP}.txt
+                fi
+                echo "❌ Failure marker uploaded"
+              fi
+            
+            # Send Slack notification
+            - echo "Sending Slack notification..."
+            - |
+              # Check if SLACK_WEBHOOK_URL is set
+              if [ -n "$SLACK_WEBHOOK_URL" ]; then
+                # Determine notification color and status
+                if [ "$TEST_FAILED" = "true" ]; then
+                  COLOR="danger"
+                  STATUS="❌ FAILED"
+                else
+                  COLOR="good"
+                  STATUS="✅ PASSED"
+                fi
+                
+                # Read test summary
+                SUMMARY_TEXT=$(cat test_summary.txt)
+                
+                # Send Slack notification using webhook
+                curl -X POST -H 'Content-type: application/json' \
+                  --data "{
+                    \"username\": \"Semaphore CI\",
+                    \"icon_emoji\": \":gear:\",
+                    \"attachments\": [{
+                      \"color\": \"${COLOR}\",
+                      \"title\": \"Gateway Version Compatibility Tests ${STATUS}\",
+                      \"text\": \"Branch: ${SEMAPHORE_GIT_BRANCH}\\nCommit: ${SEMAPHORE_GIT_SHA:0:7}\\n\\n\`\`\`\\n${SUMMARY_TEXT}\\n\`\`\`\",
+                      \"fields\": [
+                        {
+                          \"title\": \"Results Location\",
+                          \"value\": \"${RESULTS_S3_PATH}\",
+                          \"short\": false
+                        },
+                        {
+                          \"title\": \"Workflow\",
+                          \"value\": \"<https://semaphore.ci.confluent.io/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
+                          \"short\": true
+                        }
+                      ]
+                    }]
+                  }" \
+                  $SLACK_WEBHOOK_URL
+                echo "✅ Slack notification sent"
+              else
+                echo "⚠️ SLACK_WEBHOOK_URL not set, skipping Slack notification"
+                echo "To enable Slack notifications, set SLACK_WEBHOOK_URL environment variable"
+              fi
+            
+            # Fail the job if tests failed
+            - |
+              if [ "$TEST_FAILED" = "true" ]; then
+                echo "❌ Version compatibility tests failed"
+                exit 1
+              else
+                echo "✅ Version compatibility tests completed successfully"
+              fi
+
+      epilogue:
+        always:
+          commands:
+            - echo "Cleaning up Docker containers and images..."
+            - docker compose -f docker-compose.yml down -v || true
+            - docker compose -f docker-compose-kraft.yml down -v || true
+            - docker system prune -f || true
