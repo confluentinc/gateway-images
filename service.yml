@@ -57,13 +57,15 @@ semaphore:
             - 'ubi'
     - name: version-compatibility-test
       branch: master
-      at: "0 21 * * 1"    # Mon at 21:00 UTC
+      at: "0 21 * * 0"    # Sun at 21:00 UTC
       pipeline_file: .semaphore/version_compatibility_test.yml
       parameters:
         - name: KAFKA_SERVER_VERSION
           required: false
+          description: "Kafka server version to test against, e.g., 8.0.0"
         - name: KAFKA_CLIENT_VERSION
           required: false
+          description: "Kafka client version to test against, e.g., 8.0.0"
 code_artifact:
   enable: true
   package_paths:
