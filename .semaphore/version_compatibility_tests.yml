@@ -201,7 +201,7 @@ blocks:
                         },
                         {
                           \"title\": \"Workflow\",
-                          \"value\": \"<https://confluent.semaphoreci.com/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
+                          \"value\": \"<https://semaphore.ci.confluent.io/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
                           \"short\": true
                         }
                       ]
