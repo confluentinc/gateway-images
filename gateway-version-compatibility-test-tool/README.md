@@ -26,16 +26,16 @@ This tool tests compatibility between different Kafka client and server versions
 
 ```bash
 # Clone/navigate to the tool directory
-cd gateway-version-compatability-test-tool
+cd gateway-version-compatibility-test-tool
 
 # Set up Python environment (one-time setup)
-./version-compatability.sh --setup-env
+./version-compatibility.sh --setup-env
 
 # Run all compatibility tests (16 combinations)
-./version-compatability.sh --run
+./version-compatibility.sh --run
 
 # Or test a single combination
-./version-compatability.sh --single 7.6.0 7.8.0
+./version-compatibility.sh --single 7.6.0 7.8.0
 ```
 
 ## Usage Options
@@ -51,13 +51,13 @@ cd gateway-version-compatability-test-tool
 
 ```bash
 # Test all combinations
-./version-compatability.sh --run
+./version-compatibility.sh --run
 
 # Test specific versions
-./version-compatability.sh --single 7.8.0 8.0.0
+./version-compatibility.sh --single 7.8.0 8.0.0
 
 # Parse existing results
-./version-compatability.sh --parse compatibility-results/20240903_090000
+./version-compatibility.sh --parse compatibility-results/20240903_090000
 ```
 
 ## Test Workflow
@@ -144,7 +144,7 @@ If you see `InvalidReplicationFactorException`, the tool automatically configure
 All Python packages are automatically installed in `venv/` directory. If issues occur:
 ```bash
 rm -rf venv/
-./version-compatability.sh --setup-env
+./version-compatibility.sh --setup-env
 ```
 
 ### Consumer Test Issues
@@ -160,8 +160,8 @@ curl -s http://localhost:9190/metrics | grep kroxylicious
 
 ### File Structure
 ```
-gateway-version-compatability-test-tool/
-├── version-compatability.sh      # Main test script
+gateway-version-compatibility-test-tool/
+├── version-compatibility.sh      # Main test script
 ├── docker-compose.yml            # Container orchestration
 ├── enhanced_metrics_parser.py    # Advanced metrics parser
 ├── api_keys.py                   # Kafka API mappings
@@ -170,7 +170,7 @@ gateway-version-compatability-test-tool/
 ```
 
 ### Adding New Versions
-Update the version arrays in `version-compatability.sh`:
+Update the version arrays in `version-compatibility.sh`:
 ```bash
 CLIENTS=("7.9.0" "8.1.0")
 SERVERS=("7.9.0" "8.1.0")
