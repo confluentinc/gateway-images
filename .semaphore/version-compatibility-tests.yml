@@ -39,8 +39,13 @@ blocks:
             
             # Run the compatibility tests
             - echo "Starting version compatibility tests..."
-            - ./version-compatibility.sh --run || TEST_FAILED=true
-            
+            - |
+              if [ -n "${KAFKA_SERVER_VERSION}" ] && [ -n "${KAFKA_CLIENT_VERSION}" ]; then
+                  echo "Running single test for Gateway ${GW_VERSION} with Kafka Broker ${KAFKA_SERVER_VERSION} and Client ${KAFKA_CLIENT_VERSION}"
+                  ./version-compatibility.sh --single "${KAFKA_SERVER_VERSION}" "${KAFKA_CLIENT_VERSION}" || TEST_FAILED=true
+              else
+                  ./version-compatibility.sh --run || TEST_FAILED=true
+              fi
             # Collect results regardless of test outcome
             - echo "Collecting test results..."
             - |
@@ -54,6 +59,10 @@ blocks:
             
             # Create summary for Slack notification
             - |
+              clean_number() {
+                  local value=$(echo "$1" | tr -d '\n\r' | xargs | grep -o '[0-9]*' | head -n1)
+                  echo "${value:-0}"
+              }
               if [ -n "${LATEST_RESULTS_DIR}" ] && [ -d "compatibility-results/${LATEST_RESULTS_DIR}" ]; then
                 echo "Creating test summary..."
                 
@@ -67,6 +76,14 @@ blocks:
                   FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
                   # Count passed tests
                   PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
+                  
+                  # print raw counts for debugging
+                  echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}"
+                  
+                  # clean numbers
+                  FAILED_TESTS=$(clean_number "${FAILED_TESTS}")
+                  PASSED_TESTS=$(clean_number "${PASSED_TESTS}")
+                  TOTAL_TESTS=$(clean_number "${TOTAL_TESTS}")
                   
                   # If we have a mismatch, calculate passed from total
                   if [ $((PASSED_TESTS + FAILED_TESTS)) -ne ${TOTAL_TESTS} ] && [ ${TOTAL_TESTS} -gt 0 ]; then
