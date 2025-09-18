@@ -64,8 +64,6 @@ semaphore:
           required: false
         - name: KAFKA_CLIENT_VERSION
           required: false
-        - name: GATEWAY_VERSION
-          required: false
 code_artifact:
   enable: true
   package_paths:
