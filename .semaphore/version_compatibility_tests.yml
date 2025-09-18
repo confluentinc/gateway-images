@@ -16,7 +16,7 @@ global_job_config:
     commands:
       - checkout
       - . vault-setup
-      - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
+      - . assume-iam-role arn:aws:iam::523370736235:role/aws-reserved/sso.amazonaws.com/us-west-2/AWSReservedSSO_nonprod-administrator_9d7e4b92dc9f791c
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
       - export S3_FOLDER="version-testing-results"
