@@ -16,6 +16,7 @@ global_job_config:
     commands:
       - checkout
       - . vault-setup
+      - . assume-iam-role arn:aws:iam::523370736235:user/semaphoreci
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
       - export S3_FOLDER="version-testing-results"
