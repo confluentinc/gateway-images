@@ -124,7 +124,8 @@ blocks:
               EOF
                 
                 echo "Test Summary:"
-                cat test_summary.txt
+                echo "" >> test_summary.txt
+                cat "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" >> test_summary.txt
               else
                 echo "No results directory found!"
                 echo "Test execution may have failed completely" > test_summary.txt
@@ -200,7 +201,7 @@ blocks:
                         },
                         {
                           \"title\": \"Workflow\",
-                          \"value\": \"<https://semaphore.ci.confluent.io/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
+                          \"value\": \"<https://confluent.semaphoreci.com/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
                           \"short\": true
                         }
                       ]
