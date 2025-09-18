@@ -90,7 +90,7 @@ run_compatibility_test() {
 
     # if kafka is not up, exit
     if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
-        echo "Kafka server not responding. Exiting test."
+        echo "❌ Kafka server not responding. Exiting test."
         docker-compose -f docker-compose.yml down
         return
     fi
