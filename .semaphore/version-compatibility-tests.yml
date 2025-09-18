@@ -224,7 +224,6 @@ blocks:
         always:
           commands:
             - echo "Cleaning up Docker containers and images..."
-            - cd gateway-version-compatibility-test-tool
             - docker compose -f docker-compose.yml down -v || true
             - docker compose -f docker-compose-kraft.yml down -v || true
             - docker system prune -f || true
