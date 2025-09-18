@@ -58,7 +58,7 @@ semaphore:
     - name: version-compatibility-test
       branch: master
       at: "0 21 * * 0"    # Sun at 21:00 UTC
-      pipeline_file: .semaphore/version_compatibility_test.yml
+      pipeline_file: .semaphore/version_compatibility_tests.yml
       parameters:
         - name: KAFKA_SERVER_VERSION
           required: false
