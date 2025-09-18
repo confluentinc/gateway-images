@@ -16,6 +16,7 @@ global_job_config:
     commands:
       - checkout
       - . vault-setup
+      - . vault-sem-get-secret v1/ci/kv/cpc-gateway/slack-webhook-tests-notifications
       - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
@@ -119,7 +120,7 @@ blocks:
               - detailed_api_usage.csv: Complete API usage data
               - compatibility_report.json: Machine-readable results
               - api_key_reference.txt: API name to integer mappings
-              - *_metrics.txt: Raw Prometheus metrics per test
+              - <client>_<server>_metrics.txt: Raw Prometheus metrics per test
               EOF
                 
                 echo "Test Summary:"
@@ -176,7 +177,7 @@ blocks:
                   STATUS="❌ FAILED"
                 else
                   COLOR="good"
-                  STATUS="✅ COMPLETED"
+                  STATUS="✅ PASSED"
                 fi
                 
                 # Read test summary
@@ -199,7 +200,7 @@ blocks:
                         },
                         {
                           \"title\": \"Workflow\",
-                          \"value\": \"<https://confluent.semaphoreci.com/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
+                          \"value\": \"<https://semaphore.ci.confluent.io/workflows/${SEMAPHORE_WORKFLOW_ID}|View Workflow>\",
                           \"short\": true
                         }
                       ]
