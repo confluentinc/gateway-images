@@ -104,14 +104,65 @@ class EnhancedKroxyliciousMetricsParser:
 
     return api_data
 
+  def parse_status_file(self, file_path, client_version, server_version, test_name):
+    """Parse status file to create entry for failed tests"""
+    try:
+      with open(file_path, 'r') as f:
+        status_content = f.read().strip()
+      
+      # Parse status file content
+      lines = status_content.split('\n')
+      status_info = {}
+      for line in lines:
+        if ':' in line:
+          key, value = line.split(':', 1)
+          status_info[key.strip()] = value.strip()
+      
+      # Determine the failure type and status
+      failure_type = status_info.get('FAILURE_TYPE', 'UNKNOWN')
+      status_message = status_info.get('SETUP_FAILED', status_info.get('SETUP_SUCCESS', 'Unknown status'))
+      
+      # Create a result entry for the failed test
+      result = {
+        'api_key': 'N/A',
+        'api_key_int': -1,  # Use -1 to indicate failed setup
+        'api_version': 'N/A',
+        'request_count': 0,
+        'client_version': client_version,
+        'server_version': server_version,
+        'test_name': test_name,
+        'timestamp': status_info.get('TIMESTAMP', datetime.now().isoformat()),
+        'client_errors': 0,
+        'upstream_errors': 0,
+        'failure_type': failure_type,
+        'status_message': status_message
+      }
+      
+      # Set status based on failure type
+      if failure_type == 'NONE':
+        result['status'] = 'SUCCESS'
+      else:
+        result['status'] = 'SETUP_FAILED'
+      
+      return result
+      
+    except Exception as e:
+      print(f"Error parsing status file {file_path}: {e}")
+      return None
+
   def process_results_directory(self, results_dir):
-    """Process all metrics files in a results directory"""
+    """Process all metrics files and status files in a results directory"""
     print(f"Processing results directory: {results_dir}")
 
+    # Find both metrics and status files
     metrics_files = [f for f in os.listdir(results_dir) if
                      f.endswith('_metrics.txt')]
-    print(f"Found {len(metrics_files)} metrics files")
+    status_files = [f for f in os.listdir(results_dir) if
+                    f.endswith('_status.txt')]
+    
+    print(f"Found {len(metrics_files)} metrics files and {len(status_files)} status files")
 
+    # Process metrics files (successful tests)
     for metrics_file in sorted(metrics_files):
       file_path = os.path.join(results_dir, metrics_file)
 
@@ -145,6 +196,37 @@ class EnhancedKroxyliciousMetricsParser:
       else:
         print(f"  Skipping {metrics_file} - not a test metrics file")
 
+    # Process status files (including failed tests)
+    for status_file in sorted(status_files):
+      file_path = os.path.join(results_dir, status_file)
+      
+      # Extract test info from filename  
+      # Expected format: java3.6_server3.8_status.txt
+      base_name = status_file.replace('_status.txt', '')
+      if 'java' in base_name and 'server' in base_name:
+        parts = base_name.split('_')
+        client_part = [p for p in parts if p.startswith('java')]
+        server_part = [p for p in parts if p.startswith('server')]
+
+        if client_part and server_part:
+          client_version = client_part[0].replace('java', '')
+          server_version = server_part[0].replace('server', '')
+
+          # Check if we already processed metrics for this combination
+          existing_result = any(r['client_version'] == client_version and 
+                              r['server_version'] == server_version 
+                              for r in self.results)
+          
+          if not existing_result:
+            # Process failed test status
+            print(f"Processing failed test: {status_file} -> Client: {client_version}, Server: {server_version}")
+            status_data = self.parse_status_file(file_path, client_version, server_version, base_name)
+            if status_data:
+              self.results.append(status_data)
+              print(f"  Added failed test entry")
+          else:
+            print(f"  Skipping {status_file} - already have metrics data for this combination")
+
   def _build_matrix_data(self):
     """Build matrix data structure from results"""
     matrix = defaultdict(lambda: {
@@ -155,17 +237,30 @@ class EnhancedKroxyliciousMetricsParser:
       'total_client_errors': 0,
       'total_upstream_errors': 0,
       'successful_apis': set(),
-      'failed_apis': set()
+      'failed_apis': set(),
+      'setup_status': 'UNKNOWN',
+      'failure_type': None,
+      'status_message': None
     })
 
     for result in self.results:
       key = f"{result['client_version']}-{result['server_version']}"
+      
+      # Handle setup failed results differently
+      if result['status'] == 'SETUP_FAILED':
+        matrix[key]['setup_status'] = 'SETUP_FAILED'
+        matrix[key]['failure_type'] = result.get('failure_type', 'UNKNOWN')
+        matrix[key]['status_message'] = result.get('status_message', 'Setup failed')
+        # Don't add API data for failed setups
+        continue
+      
       matrix[key]['apis'].add(result['api_key'])
       matrix[key]['api_ints'].add(str(result['api_key_int']))
       matrix[key]['api_versions'].add(result['api_version'])
       matrix[key]['total_requests'] += result['request_count']
       matrix[key]['total_client_errors'] = result['client_errors']
       matrix[key]['total_upstream_errors'] = result['upstream_errors']
+      matrix[key]['setup_status'] = 'SUCCESS'
 
       if result['status'] == 'SUCCESS':
         matrix[key]['successful_apis'].add(
@@ -183,9 +278,17 @@ class EnhancedKroxyliciousMetricsParser:
       fieldnames = ['api_key', 'api_key_int', 'api_version', 'client_version',
                     'server_version',
                     'request_count', 'client_errors', 'upstream_errors',
-                    'status', 'test_name', 'timestamp']
+                    'status', 'test_name', 'timestamp', 'failure_type', 'status_message']
       writer = csv.DictWriter(f, fieldnames=fieldnames)
       writer.writeheader()
+      
+      # Add failure_type and status_message fields to results that don't have them
+      for result in self.results:
+        if 'failure_type' not in result:
+          result['failure_type'] = None
+        if 'status_message' not in result:
+          result['status_message'] = None
+      
       writer.writerows(self.results)
     return csv_file
 
@@ -194,34 +297,45 @@ class EnhancedKroxyliciousMetricsParser:
     summary_file = os.path.join(output_dir, "compatibility_summary.txt")
     with open(summary_file, 'w') as f:
       f.write("KAFKA CLIENT COMPATIBILITY TEST RESULTS\n")
-      f.write("=" * 100 + "\n\n")
+      f.write("=" * 120 + "\n\n")
       f.write(
-        f"{'CLIENT':<8} | {'SERVER':<8} | {'SUCCESSFUL_APIS':<30} | {'FAILED_APIS':<20} | {'REQUESTS':<8} | {'ERRORS':<8} | STATUS\n")
-      f.write("-" * 100 + "\n")
+        f"{'CLIENT':<8} | {'SERVER':<8} | {'SUCCESSFUL_APIS':<25} | {'FAILED_APIS':<15} | {'REQUESTS':<8} | {'ERRORS':<8} | {'STATUS':<15} | FAILURE_REASON\n")
+      f.write("-" * 120 + "\n")
 
       for key, data in sorted(matrix.items()):
         client_ver, server_ver = key.split('-')
-        successful_apis = ','.join(sorted(data['successful_apis']))[
-                          :25] + "..." if len(
-          ','.join(data['successful_apis'])) > 25 else ','.join(
-          sorted(data['successful_apis']))
-        failed_apis = ','.join(sorted(data['failed_apis']))[:15] + "..." if len(
-          ','.join(data['failed_apis'])) > 15 else ','.join(
-          sorted(data['failed_apis']))
-
-        total_errors = data['total_client_errors'] + data[
-          'total_upstream_errors']
-        requests = int(data['total_requests'])
-
-        if total_errors == 0 and requests > 0:
-          status = "✅ PASS"
-        elif total_errors > 0:
-          status = "❌ FAIL"
+        
+        # Check if this was a setup failure
+        if data['setup_status'] == 'SETUP_FAILED':
+          status = "🚫 SETUP_FAILED"
+          failure_reason = data.get('failure_type', 'UNKNOWN')
+          successful_apis = "N/A"
+          failed_apis = "N/A"
+          requests = 0
+          total_errors = 0
         else:
-          status = "⚠️ NO_DATA"
+          successful_apis = ','.join(sorted(data['successful_apis']))[
+                            :20] + "..." if len(
+            ','.join(data['successful_apis'])) > 20 else ','.join(
+            sorted(data['successful_apis']))
+          failed_apis = ','.join(sorted(data['failed_apis']))[:10] + "..." if len(
+            ','.join(data['failed_apis'])) > 10 else ','.join(
+            sorted(data['failed_apis']))
+
+          total_errors = data['total_client_errors'] + data[
+            'total_upstream_errors']
+          requests = int(data['total_requests'])
+          failure_reason = ""
+
+          if total_errors == 0 and requests > 0:
+            status = "✅ PASS"
+          elif total_errors > 0:
+            status = "❌ FAIL"
+          else:
+            status = "⚠️ NO_DATA"
 
         f.write(
-          f"{client_ver:<8} | {server_ver:<8} | {successful_apis:<30} | {failed_apis:<20} | {requests:<8} | {int(total_errors):<8} | {status}\n")
+          f"{client_ver:<8} | {server_ver:<8} | {successful_apis:<25} | {failed_apis:<15} | {requests:<8} | {int(total_errors):<8} | {status:<15} | {failure_reason}\n")
     return summary_file
 
   def _generate_api_reference(self, output_dir):
@@ -247,18 +361,26 @@ class EnhancedKroxyliciousMetricsParser:
   def _generate_json_report(self, output_dir, matrix):
     """Generate JSON report"""
     json_file = os.path.join(output_dir, "compatibility_report.json")
+    
+    # Count setup failures and successes
+    setup_failures = sum(1 for v in matrix.values() if v['setup_status'] == 'SETUP_FAILED')
+    setup_successes = sum(1 for v in matrix.values() if v['setup_status'] == 'SUCCESS')
+    
     with open(json_file, 'w') as f:
       json.dump({
         'test_timestamp': datetime.now().isoformat(),
         'total_combinations': len(matrix),
-        'total_api_calls': len(self.results),
+        'setup_successes': setup_successes,
+        'setup_failures': setup_failures,
+        'total_api_calls': len([r for r in self.results if r['status'] != 'SETUP_FAILED']),
         'matrix_results': {
           k: {**v, 'apis': list(v['apis']), 'api_ints': list(v['api_ints']),
               'api_versions': list(v['api_versions']),
               'successful_apis': list(v['successful_apis']),
               'failed_apis': list(v['failed_apis'])} for k, v in
           matrix.items()},
-        'api_key_mapping': KAFKA_API_KEYS
+        'api_key_mapping': KAFKA_API_KEYS,
+        'setup_failed_combinations': [k for k, v in matrix.items() if v['setup_status'] == 'SETUP_FAILED']
       }, f, indent=2, default=str)
     return json_file
 
