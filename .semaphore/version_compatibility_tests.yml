@@ -69,27 +69,36 @@ blocks:
                 echo "Creating test summary..."
                 
                 # Count total tests and analyze results
-                TOTAL_TESTS=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_metrics.txt" | wc -l)
+                # Count metrics files (successful tests) and status files (all tests including failures)
+                METRICS_FILES=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_metrics.txt" | wc -l)
+                STATUS_FILES=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_status.txt" | wc -l)
+                
+                # Total tests should be the maximum of metrics files or status files
+                # since status files are created for all tests (success and failure)
+                TOTAL_TESTS=$([ ${STATUS_FILES} -gt ${METRICS_FILES} ] && echo ${STATUS_FILES} || echo ${METRICS_FILES})
+                
                 FAILED_TESTS=0
                 PASSED_TESTS=0
+                SETUP_FAILED_TESTS=0
                 
                 if [ -f "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" ]; then
-                  # Count failed tests
+                  # Count different test result types
                   FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
-                  # Count passed tests
                   PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
+                  SETUP_FAILED_TESTS=$(grep -c "🚫 SETUP_FAILED" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
                   
                   # print raw counts for debugging
-                  echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}"
+                  echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}, Setup Failed: ${SETUP_FAILED_TESTS}"
                   
                   # clean numbers
                   FAILED_TESTS=$(clean_number "${FAILED_TESTS}")
                   PASSED_TESTS=$(clean_number "${PASSED_TESTS}")
+                  SETUP_FAILED_TESTS=$(clean_number "${SETUP_FAILED_TESTS}")
                   TOTAL_TESTS=$(clean_number "${TOTAL_TESTS}")
                   
                   # If we have a mismatch, calculate passed from total
-                  if [ $((PASSED_TESTS + FAILED_TESTS)) -ne ${TOTAL_TESTS} ] && [ ${TOTAL_TESTS} -gt 0 ]; then
-                    PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS))
+                  if [ $((PASSED_TESTS + FAILED_TESTS + SETUP_FAILED_TESTS)) -ne ${TOTAL_TESTS} ] && [ ${TOTAL_TESTS} -gt 0 ]; then
+                    PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS - SETUP_FAILED_TESTS))
                   fi
                 else
                   # Fallback calculation if summary doesn't exist
@@ -112,6 +121,7 @@ blocks:
               Total Test Combinations: ${TOTAL_TESTS}
               Passed: ${PASSED_TESTS}
               Failed: ${FAILED_TESTS}
+              Setup Failed: ${SETUP_FAILED_TESTS}
               Success Rate: ${SUCCESS_RATE}%
               Results Location: ${RESULTS_S3_PATH}
               
@@ -172,11 +182,21 @@ blocks:
             - |
               # Check if SLACK_WEBHOOK_URL is set
               if [ -n "$SLACK_WEBHOOK_URL" ]; then
-                # Determine notification color and status
+                # Determine notification color and status based on test results
                 if [ "$TEST_FAILED" = "true" ]; then
+                  # Script execution failed (e.g., script error, complete failure)
                   COLOR="danger"
                   STATUS="❌ FAILED"
+                elif [ "${FAILED_TESTS:-0}" -gt 0 ]; then
+                  # Actual test failures occurred
+                  COLOR="danger"
+                  STATUS="❌ TEST FAILURES"
+                elif [ "${SETUP_FAILED_TESTS:-0}" -gt 0 ]; then
+                  # Setup failures occurred but no test failures
+                  COLOR="warning"
+                  STATUS="⚠️ SETUP FAILURES"
                 else
+                  # All tests passed
                   COLOR="good"
                   STATUS="✅ PASSED"
                 fi
@@ -214,13 +234,21 @@ blocks:
                 echo "To enable Slack notifications, set SLACK_WEBHOOK_URL environment variable"
               fi
             
-            # Fail the job if tests failed
+            # Fail the job if tests failed (but not for setup failures)
             - |
               if [ "$TEST_FAILED" = "true" ]; then
-                echo "❌ Version compatibility tests failed"
+                echo "❌ Version compatibility tests failed (script execution error)"
                 exit 1
+              elif [ "${FAILED_TESTS:-0}" -gt 0 ]; then
+                echo "❌ Version compatibility tests failed (${FAILED_TESTS} test failures)"
+                exit 1
+              elif [ "${SETUP_FAILED_TESTS:-0}" -gt 0 ]; then
+                echo "⚠️ Version compatibility tests completed with ${SETUP_FAILED_TESTS} setup failures"
+                echo "Setup failures don't fail the pipeline - they indicate infrastructure issues"
+                exit 0
               else
                 echo "✅ Version compatibility tests completed successfully"
+                exit 0
               fi
 
       epilogue:
