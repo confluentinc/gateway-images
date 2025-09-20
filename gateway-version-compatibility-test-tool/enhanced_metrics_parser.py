@@ -4,6 +4,7 @@ Enhanced Kroxylicious Compatibility Test Metrics Parser
 Parses Prometheus metrics to generate compatibility reports with integer API keys
 """
 
+from ast import Nonlocal
 import csv
 import json
 import os
@@ -125,7 +126,7 @@ class EnhancedKroxyliciousMetricsParser:
       # Create a result entry for the failed test
       result = {
         'api_key': 'N/A',
-        'api_key_int': -1,  # Use -1 to indicate failed setup
+        'api_key_int': None,  # Use None to indicate failed setup
         'api_version': 'N/A',
         'request_count': 0,
         'client_version': client_version,

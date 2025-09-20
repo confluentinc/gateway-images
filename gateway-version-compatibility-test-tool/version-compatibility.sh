@@ -69,7 +69,8 @@ run_compatibility_test() {
     # if kafka_server_version starts after 8.0.0, use KRaft mode: docker-compose-kraft.yml
     if version_ge $server_ver "8.0.0"; then
         echo "Starting Kafka in KRaft mode..."
-        if ! docker-compose -f docker-compose-kraft.yml up -d; then
+        COMPOSE_FILE="docker-compose-kraft.yml"
+        if ! docker-compose -f $COMPOSE_FILE up -d; then
             echo "❌ Failed to start services in KRaft mode"
             echo "SETUP_FAILED: Docker compose failed to start services (KRaft mode)" > "$RESULTS_DIR/${test_id}_status.txt"
             echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -77,7 +78,8 @@ run_compatibility_test() {
             return 1
         fi
     else
-        if ! docker-compose -f docker-compose.yml up -d; then
+        COMPOSE_FILE="docker-compose.yml"
+        if ! docker-compose -f $COMPOSE_FILE up -d; then
             echo "❌ Failed to start services"
             echo "SETUP_FAILED: Docker compose failed to start services" > "$RESULTS_DIR/${test_id}_status.txt"
             echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -91,7 +93,7 @@ run_compatibility_test() {
     sleep 10
     
     # Reset metrics baseline (restart gateway to clear counters)
-    # docker-compose -f docker-compose.yml restart gateway
+    # docker-compose -f $COMPOSE_FILE restart gateway
     # sleep 10
     echo "Checking service availability..."
     if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
@@ -100,7 +102,7 @@ run_compatibility_test() {
         echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-        docker-compose -f docker-compose.yml down
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
 
@@ -111,7 +113,7 @@ run_compatibility_test() {
         echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-        docker-compose -f docker-compose.yml down
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
     
@@ -181,7 +183,7 @@ run_compatibility_test() {
     fi
     
     # Cleanup
-    docker-compose -f docker-compose.yml down
+    docker-compose -f $COMPOSE_FILE down
     
     echo "Completed: $test_id"
 }
