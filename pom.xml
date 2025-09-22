@@ -22,7 +22,7 @@
     <parent>
         <groupId>io.confluent</groupId>
         <artifactId>common-docker</artifactId>
-        <version>[8.0.0-0, 8.0.1-0)</version>
+        <version>[8.2.0-0, 8.2.1-0)</version>
     </parent>
 
     <groupId>io.confluent.gateway-images</groupId>
@@ -30,7 +30,7 @@
     <packaging>pom</packaging>
     <name>Gateway Docker Images</name>
     <description>Build files for Confluent's Gateway Docker Images</description>
-    <version>1.0.0-0</version>
+    <version>1.1.0-0</version>
 
     <modules>
         <module>gateway</module>
@@ -71,7 +71,7 @@
 
     <properties>
         <component.name>gateway</component.name>
-        <io.confluent.gateway-images.version>1.0.0-0</io.confluent.gateway-images.version>
+        <io.confluent.gateway-images.version>1.1.0-0</io.confluent.gateway-images.version>
         <arch.type>.arm64</arch.type>
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
