@@ -245,10 +245,8 @@ blocks:
               elif [ "${SETUP_FAILED_TESTS:-0}" -gt 0 ]; then
                 echo "⚠️ Version compatibility tests completed with ${SETUP_FAILED_TESTS} setup failures"
                 echo "Setup failures don't fail the pipeline - they indicate infrastructure issues"
-                exit 0
               else
                 echo "✅ Version compatibility tests completed successfully"
-                exit 0
               fi
 
       epilogue:
