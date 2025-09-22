@@ -55,7 +55,7 @@ semaphore:
           required: true
           options:
             - 'ubi'
-    - name: version-compatibility-test
+    - name: version-compatibility-tests
       branch: master
       at: "0 21 * * 0"    # Sun at 21:00 UTC
       pipeline_file: .semaphore/version_compatibility_tests.yml

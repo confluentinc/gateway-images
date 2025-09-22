@@ -69,9 +69,23 @@ run_compatibility_test() {
     # if kafka_server_version starts after 8.0.0, use KRaft mode: docker-compose-kraft.yml
     if version_ge $server_ver "8.0.0"; then
         echo "Starting Kafka in KRaft mode..."
-        docker-compose -f docker-compose-kraft.yml up -d
+        COMPOSE_FILE="docker-compose-kraft.yml"
+        if ! docker-compose -f $COMPOSE_FILE up -d; then
+            echo "❌ Failed to start services in KRaft mode"
+            echo "SETUP_FAILED: Docker compose failed to start services (KRaft mode)" > "$RESULTS_DIR/${test_id}_status.txt"
+            echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
+            echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+            return 1
+        fi
     else
-        docker-compose -f docker-compose.yml up -d
+        COMPOSE_FILE="docker-compose.yml"
+        if ! docker-compose -f $COMPOSE_FILE up -d; then
+            echo "❌ Failed to start services"
+            echo "SETUP_FAILED: Docker compose failed to start services" > "$RESULTS_DIR/${test_id}_status.txt"
+            echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
+            echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+            return 1
+        fi
     fi
     
     # Wait for startup
@@ -79,20 +93,28 @@ run_compatibility_test() {
     sleep 10
     
     # Reset metrics baseline (restart gateway to clear counters)
-    # docker-compose -f docker-compose.yml restart gateway
+    # docker-compose -f $COMPOSE_FILE restart gateway
     # sleep 10
     echo "Checking service availability..."
     if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
-        echo "Gateway not responding. Exiting test."
-        docker-compose -f docker-compose.yml down
-        return
+        echo "❌ Gateway not responding. Exiting test."
+        # Create status file to track the failure
+        echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+        docker-compose -f $COMPOSE_FILE down
+        return 1
     fi
 
     # if kafka is not up, exit
     if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
         echo "❌ Kafka server not responding. Exiting test."
-        docker-compose -f docker-compose.yml down
-        return
+        # Create status file to track the failure
+        echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+        docker-compose -f $COMPOSE_FILE down
+        return 1
     fi
     
     # Run test operations
@@ -148,10 +170,20 @@ run_compatibility_test() {
     
     # Scrape metrics
     sleep 5
-    curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
+    if curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"; then
+        # Create success status file
+        echo "SETUP_SUCCESS: Test completed successfully" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: NONE" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+    else
+        # Failed to scrape metrics at the end
+        echo "SETUP_FAILED: Failed to scrape final metrics" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: METRICS_SCRAPE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+    fi
     
     # Cleanup
-    docker-compose -f docker-compose.yml down
+    docker-compose -f $COMPOSE_FILE down
     
     echo "Completed: $test_id"
 }
