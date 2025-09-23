@@ -21,6 +21,7 @@ Following secret stores are supported for fetching the credentials,
 1. HashiCorp Vault
 2. AWS Secret Manager
 3. Azure Key Vault
+4. File
 
 More details on how to configure Gateway with different secret stores are available [here](https://github.com/confluentinc/gateway-images/blob/master/examples/CONFIG_GUIDE.md#5-secret-stores)
 
