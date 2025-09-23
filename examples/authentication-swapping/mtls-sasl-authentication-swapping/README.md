@@ -66,8 +66,8 @@ gateway:
       - kafka-1
       - vault
     volumes:
-      - ${GATEWAY_JAAS_CONF_FOR_GW_AUTHN}:/etc/gateway/config/jaas-config-for-gw-authn.conf # loading JAAS config for SASL authentication at Gateway
       - ${GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING}:/etc/gateway/config/jaas-template-for-gw-swapping.conf # loading JAAS template for SASL authentication at Gateway
+      - ./ssl:/etc/gateway/ssl # Certificates to be configured on Gateway.
     environment:
       GATEWAY_CONFIG: | 
         gateway:
