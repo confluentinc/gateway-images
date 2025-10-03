@@ -1,0 +1,22 @@
+services:
+  gateway:
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
+    container_name: cc-passthrough-gateway
+    volumes:
+      - ./gateway.yaml:/etc/gateway/gateway.yaml:ro
+      - ./ssl:/etc/gateway/ssl:ro
+    environment:
+      GATEWAY_CONFIG_FILE: /etc/gateway/gateway.yaml
+    ports:
+      - "19092:19092"
+      - "19093:19093"
+      - "19094:19094"
+      - "19095:19095"
+      - "19096:19096"
+      - "19097:19097"
+      - "9190:9190"
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "
