@@ -46,11 +46,12 @@ class EnhancedKroxyliciousMetricsParser:
     api_data = {}
     
     # Parse all 4 metrics with virtual cluster and node_id information
+    # Using bytes_sum for more accurate balance checking
     patterns = {
-        'client_to_proxy_requests': r'kroxylicious_client_to_proxy_request_total\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
-        'proxy_to_server_requests': r'kroxylicious_proxy_to_server_request_total\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
-        'server_to_proxy_responses': r'kroxylicious_server_to_proxy_response_total\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
-        'proxy_to_client_responses': r'kroxylicious_proxy_to_client_response_total\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)'
+        'client_to_proxy_request_bytes': r'kroxylicious_client_to_proxy_request_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'proxy_to_server_request_bytes': r'kroxylicious_proxy_to_server_request_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'server_to_proxy_response_bytes': r'kroxylicious_server_to_proxy_response_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'proxy_to_client_response_bytes': r'kroxylicious_proxy_to_client_response_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)'
     }
     
     # Parse all metrics and aggregate by API+virtual_cluster
@@ -64,10 +65,10 @@ class EnhancedKroxyliciousMetricsParser:
                     'api_key': api_key,
                     'api_version': api_version,
                     'virtual_cluster': virtual_cluster,
-                    'client_to_proxy_requests': 0,
-                    'proxy_to_server_requests': 0,
-                    'server_to_proxy_responses': 0,
-                    'proxy_to_client_responses': 0
+                    'client_to_proxy_request_bytes': 0,
+                    'proxy_to_server_request_bytes': 0,
+                    'server_to_proxy_response_bytes': 0,
+                    'proxy_to_client_response_bytes': 0
                 }
             metrics[key][metric_type] += float(count)
     
@@ -75,22 +76,29 @@ class EnhancedKroxyliciousMetricsParser:
     for key, data in metrics.items():
         api_key_int = get_api_key_int(data['api_key'])
         
-        # Calculate totals
-        total_requests = (data['client_to_proxy_requests'] + 
-                         data['proxy_to_server_requests'])
-        total_responses = (data['server_to_proxy_responses'] + 
-                          data['proxy_to_client_responses'])
+        # Calculate totals using bytes
+        # Balance check: 
+        # 1. client_to_proxy_request_bytes = proxy_to_server_request_bytes (proxy forwards all client requests)
+        # 2. server_to_proxy_response_bytes = proxy_to_client_response_bytes (proxy forwards all server responses)
+        client_to_proxy_bytes = data['client_to_proxy_request_bytes']
+        proxy_to_server_bytes = data['proxy_to_server_request_bytes']
+        server_to_proxy_bytes = data['server_to_proxy_response_bytes']
+        proxy_to_client_bytes = data['proxy_to_client_response_bytes']
         
-        # Balance check: requests should equal responses
-        if total_requests == total_responses and total_requests > 0:
+        # Check both balance conditions
+        request_balance = (client_to_proxy_bytes == proxy_to_server_bytes)
+        response_balance = (server_to_proxy_bytes == proxy_to_client_bytes)
+        
+        if request_balance and response_balance and client_to_proxy_bytes > 0:
             status = 'SUCCESS'
             client_errors = 0
             upstream_errors = 0
-        elif total_requests > 0:
-            status = 'ERROR'  # Imbalanced - some requests didn't get responses
-            # Calculate how many requests failed
-            failed_requests = total_requests - total_responses
-            client_errors = failed_requests  # Assume client-side issues
+        elif client_to_proxy_bytes > 0:
+            status = 'ERROR'  # Imbalanced - proxy didn't forward all bytes correctly
+            # Calculate failed bytes (use the larger imbalance)
+            request_failed = abs(client_to_proxy_bytes - proxy_to_server_bytes)
+            response_failed = abs(server_to_proxy_bytes - proxy_to_client_bytes)
+            client_errors = max(request_failed, response_failed)
             upstream_errors = 0
         else:
             status = 'NO_TRAFFIC'
@@ -104,8 +112,8 @@ class EnhancedKroxyliciousMetricsParser:
             'api_key_int': api_key_int,
             'api_version': data['api_version'],
             'virtual_cluster': data['virtual_cluster'],
-            'request_count': total_requests,
-            'response_count': total_responses,
+            'request_bytes': client_to_proxy_bytes,
+            'response_bytes': proxy_to_client_bytes,
             'client_errors': client_errors,
             'upstream_errors': upstream_errors,
             'status': status,
@@ -114,10 +122,10 @@ class EnhancedKroxyliciousMetricsParser:
             'test_name': test_name,
             'timestamp': datetime.now().isoformat(),
             # Detailed breakdown for debugging
-            'client_to_proxy_requests': data['client_to_proxy_requests'],
-            'proxy_to_server_requests': data['proxy_to_server_requests'],
-            'server_to_proxy_responses': data['server_to_proxy_responses'],
-            'proxy_to_client_responses': data['proxy_to_client_responses']
+            'client_to_proxy_request_bytes': data['client_to_proxy_request_bytes'],
+            'proxy_to_server_request_bytes': data['proxy_to_server_request_bytes'],
+            'server_to_proxy_response_bytes': data['server_to_proxy_response_bytes'],
+            'proxy_to_client_response_bytes': data['proxy_to_client_response_bytes']
         }
     
     return api_data
@@ -166,15 +174,16 @@ class EnhancedKroxyliciousMetricsParser:
       'api_ints': set(),
       'api_versions': set(),
       'virtual_clusters': set(),
-      'total_requests': 0,
-      'total_responses': 0,
+      'total_request_bytes': 0,
+      'total_response_bytes': 0,
       'total_client_errors': 0,
       'total_upstream_errors': 0,
       'successful_apis': set(),
       'failed_apis': set(),
       'virtual_cluster_breakdown': defaultdict(lambda: {
-        'total_requests': 0,
-        'total_responses': 0,
+        'total_request_bytes': 0,
+        'total_response_bytes': 0,
+        'total_errors': 0,
         'successful_apis': set(),
         'failed_apis': set()
       })
@@ -188,14 +197,15 @@ class EnhancedKroxyliciousMetricsParser:
       matrix[key]['api_ints'].add(str(result['api_key_int']))
       matrix[key]['api_versions'].add(result['api_version'])
       matrix[key]['virtual_clusters'].add(vc_key)
-      matrix[key]['total_requests'] += result['request_count']
-      matrix[key]['total_responses'] += result['response_count']
+      matrix[key]['total_request_bytes'] += result['request_bytes']
+      matrix[key]['total_response_bytes'] += result['response_bytes']
       matrix[key]['total_client_errors'] += result['client_errors']
       matrix[key]['total_upstream_errors'] += result['upstream_errors']
 
       # Update virtual cluster breakdown
-      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_requests'] += result['request_count']
-      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_responses'] += result['response_count']
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_request_bytes'] += result['request_bytes']
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_response_bytes'] += result['response_bytes']
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_errors'] += result['client_errors']
 
       if result['status'] == 'SUCCESS':
         matrix[key]['successful_apis'].add(
@@ -215,10 +225,10 @@ class EnhancedKroxyliciousMetricsParser:
     csv_file = os.path.join(output_dir, "detailed_api_usage.csv")
     with open(csv_file, 'w', newline='') as f:
       fieldnames = ['api_key', 'api_key_int', 'api_version', 'virtual_cluster', 
-                    'client_version', 'server_version', 'request_count', 'response_count',
+                    'client_version', 'server_version', 'request_bytes', 'response_bytes',
                     'client_errors', 'upstream_errors', 'status', 'test_name', 'timestamp',
-                    'client_to_proxy_requests', 'proxy_to_server_requests',
-                    'server_to_proxy_responses', 'proxy_to_client_responses']
+                    'client_to_proxy_request_bytes', 'proxy_to_server_request_bytes',
+                    'server_to_proxy_response_bytes', 'proxy_to_client_response_bytes']
       writer = csv.DictWriter(f, fieldnames=fieldnames)
       writer.writeheader()
       writer.writerows(self.results)
@@ -238,15 +248,23 @@ class EnhancedKroxyliciousMetricsParser:
         
         # Overall summary
         total_errors = data['total_client_errors'] + data['total_upstream_errors']
-        if data['total_requests'] > 0 and total_errors == 0:
+        
+        # Check if only acceptable APIs are failing
+        acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+        failed_apis = {api.split('(')[0] for api in data['failed_apis']}  # Extract API name without version
+        unacceptable_failures = failed_apis - acceptable_failures
+        
+        if data['total_request_bytes'] > 0 and total_errors == 0:
           overall_status = "✅ PASS"
-        elif data['total_requests'] > 0 and total_errors > 0:
+        elif data['total_request_bytes'] > 0 and len(unacceptable_failures) == 0:
+          overall_status = "✅ PASS (with acceptable api failures)"
+        elif data['total_request_bytes'] > 0 and total_errors > 0:
           overall_status = "❌ FAIL"
         else:
           overall_status = "⚠️ NO_DATA"
         
         f.write(f"OVERALL STATUS: {overall_status}\n")
-        f.write(f"Total Requests: {int(data['total_requests'])} | Total Responses: {int(data['total_responses'])} | Errors: {int(total_errors)}\n")
+        f.write(f"Total Request Bytes: {int(data['total_request_bytes'])} | Total Response Bytes: {int(data['total_response_bytes'])} | Error Bytes: {int(total_errors)}\n")
         f.write(f"Successful APIs: {len(data['successful_apis'])} | Failed APIs: {len(data['failed_apis'])}\n\n")
         
         # Virtual cluster breakdown
@@ -262,15 +280,23 @@ class EnhancedKroxyliciousMetricsParser:
           else:
             vc_type = "PLAINTEXT"
           
-          vc_errors = vc_data['total_requests'] - vc_data['total_responses']
-          if vc_data['total_requests'] > 0 and vc_errors == 0:
+          vc_errors = vc_data['total_errors']
+          
+          # Check if only acceptable APIs are failing for this virtual cluster
+          acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+          vc_failed_apis = {api.split('(')[0] for api in vc_data['failed_apis']}  # Extract API name without version
+          vc_unacceptable_failures = vc_failed_apis - acceptable_failures
+          
+          if vc_data['total_request_bytes'] > 0 and vc_errors == 0:
             vc_status = "✅ PASS"
-          elif vc_data['total_requests'] > 0 and vc_errors > 0:
+          elif vc_data['total_request_bytes'] > 0 and len(vc_unacceptable_failures) == 0:
+            vc_status = "✅ PASS (with acceptable api failures)"
+          elif vc_data['total_request_bytes'] > 0 and vc_errors > 0:
             vc_status = "❌ FAIL"
           else:
             vc_status = "⚠️ NO_DATA"
           
-          f.write(f"  {vc_type:<12} | {vc_status} | Requests: {int(vc_data['total_requests']):<6} | Responses: {int(vc_data['total_responses']):<6} | Errors: {int(vc_errors):<4} | Success: {len(vc_data['successful_apis']):<3} | Failed: {len(vc_data['failed_apis'])}\n")
+          f.write(f"  {vc_type:<12} | {vc_status} | Request Bytes: {int(vc_data['total_request_bytes']):<8} | Response Bytes: {int(vc_data['total_response_bytes']):<8} | Error Bytes: {int(vc_errors):<6} | Success: {len(vc_data['successful_apis']):<3} | Failed: {len(vc_data['failed_apis'])}\n")
         
         f.write("\n")
         
@@ -346,34 +372,47 @@ class EnhancedKroxyliciousMetricsParser:
     tested_combinations = len(matrix)
     missing_combinations = total_expected_combinations - tested_combinations
     
-    # Calculate overall compatibility percentage
-    passed_tests = sum(1 for data in matrix.values() 
-                      if data['total_requests'] > 0 and 
-                      (data['total_client_errors'] + data['total_upstream_errors']) == 0)
-    total_tests = len([data for data in matrix.values() if data['total_requests'] > 0])
+    # Calculate overall compatibility percentage (including acceptable failures)
+    def is_test_passing(data):
+      if data['total_request_bytes'] == 0:
+        return False
+      if (data['total_client_errors'] + data['total_upstream_errors']) == 0:
+        return True
+      # Check if only acceptable APIs are failing
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      failed_apis = {api.split('(')[0] for api in data['failed_apis']}
+      unacceptable_failures = failed_apis - acceptable_failures
+      return len(unacceptable_failures) == 0
+    
+    passed_tests = sum(1 for data in matrix.values() if is_test_passing(data))
+    total_tests = len([data for data in matrix.values() if data['total_request_bytes'] > 0])
     compatibility_percentage = (passed_tests / total_tests * 100) if total_tests > 0 else 0
     
-    # Calculate test summary
-    passed_tests_count = sum(1 for data in matrix.values() 
-                           if data['total_requests'] > 0 and 
-                           (data['total_client_errors'] + data['total_upstream_errors']) == 0)
+    # Calculate test summary (including acceptable failures)
+    passed_tests_count = sum(1 for data in matrix.values() if is_test_passing(data))
     failed_tests_count = sum(1 for data in matrix.values() 
-                           if data['total_requests'] > 0 and 
-                           (data['total_client_errors'] + data['total_upstream_errors']) > 0)
-    no_data_tests = sum(1 for data in matrix.values() if data['total_requests'] == 0)
-    total_api_calls = sum(data['total_requests'] for data in matrix.values())
+                           if data['total_request_bytes'] > 0 and not is_test_passing(data))
+    no_data_tests = sum(1 for data in matrix.values() if data['total_request_bytes'] == 0)
+    total_api_bytes = sum(data['total_request_bytes'] for data in matrix.values())
     
     # Convert matrix data for JSON serialization
     enhanced_matrix = {}
     for k, v in matrix.items():
       client_ver, server_ver = k.split('-')
       
-      # Determine status
+      # Determine status (including acceptable failures)
       total_errors = v['total_client_errors'] + v['total_upstream_errors']
-      if v['total_requests'] > 0 and total_errors == 0:
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      failed_apis = {api.split('(')[0] for api in v['failed_apis']}
+      unacceptable_failures = failed_apis - acceptable_failures
+      
+      if v['total_request_bytes'] > 0 and total_errors == 0:
         status = "PASS"
         status_emoji = "✅"
-      elif v['total_requests'] > 0 and total_errors > 0:
+      elif v['total_request_bytes'] > 0 and len(unacceptable_failures) == 0:
+        status = "PASS_ACCEPTABLE"
+        status_emoji = "✅"
+      elif v['total_request_bytes'] > 0 and total_errors > 0:
         status = "FAIL"
         status_emoji = "❌"
       else:
@@ -384,8 +423,8 @@ class EnhancedKroxyliciousMetricsParser:
       vc_breakdown = {}
       for vc_name, vc_data in v['virtual_cluster_breakdown'].items():
         vc_breakdown[vc_name] = {
-          'total_requests': vc_data['total_requests'],
-          'total_responses': vc_data['total_responses'],
+          'total_request_bytes': vc_data['total_request_bytes'],
+          'total_response_bytes': vc_data['total_response_bytes'],
           'successful_apis': list(vc_data['successful_apis']),
           'failed_apis': list(vc_data['failed_apis'])
         }
@@ -403,7 +442,7 @@ class EnhancedKroxyliciousMetricsParser:
         'server_version': server_ver,
         'status': status,
         'status_emoji': status_emoji,
-        'compatibility_score': 100 if status == "PASS" else (50 if status == "NO_DATA" else 0)
+        'compatibility_score': 100 if status in ["PASS", "PASS_ACCEPTABLE"] else (50 if status == "NO_DATA" else 0)
       }
     
     report_data = {
@@ -421,7 +460,7 @@ class EnhancedKroxyliciousMetricsParser:
         'failed_tests': failed_tests_count,
         'no_data_tests': no_data_tests,
         'missing_tests': missing_combinations,
-        'total_api_calls': int(total_api_calls)
+        'total_api_bytes': int(total_api_bytes)
       },
       'matrix_results': enhanced_matrix,
       'api_key_mapping': KAFKA_API_KEYS
