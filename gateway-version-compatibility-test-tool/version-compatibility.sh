@@ -388,22 +388,6 @@ generate_final_report() {
 # JAVA APPLICATION BUILD AND TEST
 # =============================================================================
 
-build_java_test_applications() {
-    echo "🔨 Building Java test applications for all client versions..."
-    
-    # Make build script executable and run it
-    chmod +x build-test-applications.sh
-    ./build-test-applications.sh
-    
-    # Check if build was successful
-    if [ $? -eq 0 ]; then
-        echo "✅ Java test applications built successfully"
-        return 0
-    else
-        echo "❌ Failed to build Java test applications"
-        return 1
-    fi
-}
 
 # Main execution
 main() {

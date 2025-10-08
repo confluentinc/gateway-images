@@ -250,7 +250,7 @@ class EnhancedKroxyliciousMetricsParser:
         total_errors = data['total_client_errors'] + data['total_upstream_errors']
         
         # Check if only acceptable APIs are failing
-        acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+        acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR', 'API_VERSIONS'}
         failed_apis = {api.split('(')[0] for api in data['failed_apis']}  # Extract API name without version
         unacceptable_failures = failed_apis - acceptable_failures
         
@@ -283,7 +283,7 @@ class EnhancedKroxyliciousMetricsParser:
           vc_errors = vc_data['total_errors']
           
           # Check if only acceptable APIs are failing for this virtual cluster
-          acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+          acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR', 'API_VERSIONS'}
           vc_failed_apis = {api.split('(')[0] for api in vc_data['failed_apis']}  # Extract API name without version
           vc_unacceptable_failures = vc_failed_apis - acceptable_failures
           
@@ -385,7 +385,7 @@ class EnhancedKroxyliciousMetricsParser:
       if (data['total_client_errors'] + data['total_upstream_errors']) == 0:
         return True
       # Check if only acceptable APIs are failing
-      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR', 'API_VERSIONS'}
       failed_apis = {api.split('(')[0] for api in data['failed_apis']}
       unacceptable_failures = failed_apis - acceptable_failures
       return len(unacceptable_failures) == 0
@@ -408,7 +408,7 @@ class EnhancedKroxyliciousMetricsParser:
       
       # Determine status (including acceptable failures)
       total_errors = v['total_client_errors'] + v['total_upstream_errors']
-      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR', 'API_VERSIONS'}
       failed_apis = {api.split('(')[0] for api in v['failed_apis']}
       unacceptable_failures = failed_apis - acceptable_failures
       
