@@ -11,6 +11,68 @@ CLIENTS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
 SERVERS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
 
 # =============================================================================
+# SSL CERTIFICATE GENERATION
+# =============================================================================
+
+generate_ssl_certificates() {
+    echo "🔒 Generating SSL certificates for SASL_SSL listener..."
+    
+    # Create ssl directory
+    mkdir -p ssl
+    cd ssl
+    
+    # Certificate configuration
+    KEYSTORE_PASSWORD="confluent"
+    TRUSTSTORE_PASSWORD="confluent"
+    KEY_PASSWORD="confluent"
+    VALIDITY_DAYS=365
+    
+    # Create credential files
+    echo "$KEYSTORE_PASSWORD" > keystore_creds
+    echo "$TRUSTSTORE_PASSWORD" > truststore_creds
+    echo "$KEY_PASSWORD" > key_creds
+    
+    # Generate CA
+    echo "Generating Certificate Authority (CA)..."
+    openssl req -new -x509 -keyout ca-key -out ca-cert -days $VALIDITY_DAYS \
+        -subj "/CN=kafka-ca" -passout pass:$KEY_PASSWORD
+    
+    # Create truststore and import CA
+    echo "Creating truststore..."
+    keytool -keystore kafka.truststore.jks -alias CARoot -import -file ca-cert \
+        -storepass $TRUSTSTORE_PASSWORD -noprompt
+    
+    # Generate server keystore
+    echo "Generating server keystore..."
+    keytool -keystore kafka.keystore.jks -alias kafka-server -validity $VALIDITY_DAYS \
+        -genkey -keyalg RSA -keysize 2048 -storepass $KEYSTORE_PASSWORD \
+        -keypass $KEY_PASSWORD -dname "CN=kafka-server,OU=Test,O=Confluent,L=CA,S=CA,C=US"
+    
+    # Generate certificate signing request
+    echo "Generating certificate signing request..."
+    keytool -keystore kafka.keystore.jks -alias kafka-server -certreq -file cert-file \
+        -storepass $KEYSTORE_PASSWORD
+    
+    # Sign the certificate with CA
+    echo "Signing certificate with CA..."
+    openssl x509 -req -CA ca-cert -CAkey ca-key -in cert-file -out cert-signed \
+        -days $VALIDITY_DAYS -CAcreateserial -passin pass:$KEY_PASSWORD
+    
+    # Import CA certificate into keystore
+    echo "Importing CA certificate into keystore..."
+    keytool -keystore kafka.keystore.jks -alias CARoot -import -file ca-cert \
+        -storepass $KEYSTORE_PASSWORD -noprompt
+    
+    # Import signed certificate into keystore
+    echo "Importing signed certificate into keystore..."
+    keytool -keystore kafka.keystore.jks -alias kafka-server -import -file cert-signed \
+        -storepass $KEYSTORE_PASSWORD -noprompt
+    
+    cd ..
+    echo "✅ SSL certificates generated successfully in ssl/ directory"
+}
+
+# =============================================================================
 # PYTHON ENVIRONMENT SETUP
 # =============================================================================
 
@@ -50,6 +112,8 @@ setup_python_env() {
 version_ge() {  # $1 >= $2 ?
     [ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
 }
+# Java application is required for all tests
+
 # Function to run test and capture metrics
 run_compatibility_test() {
     local client_ver=$1
@@ -60,130 +124,202 @@ run_compatibility_test() {
     echo "Test ID: $test_id"
     echo "----------------------------------------"
 
+    # Generate SSL certificates if they don't exist
+    if [ ! -d "ssl" ] || [ ! -f "ssl/kafka.keystore.jks" ]; then
+        generate_ssl_certificates
+    fi
+
     # print images being used
     export KAFKA_CLIENT_VERSION="$client_ver"
     export KAFKA_SERVER_VERSION="$server_ver"
     echo "Using Kafka Client Image: $KAFKA_CLIENT_VERSION"
     echo "Using Kafka Server Image: $KAFKA_SERVER_VERSION"
+    
+    # Set up volume mounts for JUnit test results
+    mkdir -p "$RESULTS_DIR/${test_id}_junit"
+    mkdir -p "$RESULTS_DIR/${test_id}_html" 
+    mkdir -p "$RESULTS_DIR/${test_id}_m2"
+    
+    export JUNIT_RESULTS_DIR="$PWD/$RESULTS_DIR/${test_id}_junit"
+    export HTML_RESULTS_DIR="$PWD/$RESULTS_DIR/${test_id}_html"
+    export MAVEN_REPO_DIR="$PWD/$RESULTS_DIR/${test_id}_m2"
+    
+    echo "JUnit results will be saved to: $JUNIT_RESULTS_DIR"
+    echo "HTML reports will be saved to: $HTML_RESULTS_DIR"
     # Start environment
     # if kafka_server_version starts after 8.0.0, use KRaft mode: docker-compose-kraft.yml
     if version_ge $server_ver "8.0.0"; then
         echo "Starting Kafka in KRaft mode..."
-        COMPOSE_FILE="docker-compose-kraft.yml"
-        if ! docker-compose -f $COMPOSE_FILE up -d; then
-            echo "❌ Failed to start services in KRaft mode"
-            echo "SETUP_FAILED: Docker compose failed to start services (KRaft mode)" > "$RESULTS_DIR/${test_id}_status.txt"
-            echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
-            echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-            return 1
-        fi
+        docker-compose -f docker-compose-kraft.yml up -d
     else
-        COMPOSE_FILE="docker-compose.yml"
-        if ! docker-compose -f $COMPOSE_FILE up -d; then
-            echo "❌ Failed to start services"
-            echo "SETUP_FAILED: Docker compose failed to start services" > "$RESULTS_DIR/${test_id}_status.txt"
-            echo "FAILURE_TYPE: DOCKER_COMPOSE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
-            echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-            return 1
-        fi
+        docker-compose -f docker-compose.yml up -d
     fi
     
-    # Wait for startup
-    echo "Waiting for services to stabilize...(10s)"
-    sleep 10
-    
-    # Reset metrics baseline (restart gateway to clear counters)
-    # docker-compose -f $COMPOSE_FILE restart gateway
-    # sleep 10
-    echo "Checking service availability..."
+    # Health checks will ensure services are ready
+    echo "Services started with health checks - verifying final connectivity..."
     if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
-        echo "❌ Gateway not responding. Exiting test."
-        # Create status file to track the failure
-        echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
-        echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
-        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-        docker-compose -f $COMPOSE_FILE down
-        return 1
+        echo "Gateway not responding. Exiting test."
+        docker-compose -f docker-compose.yml down
+        return
     fi
 
     # if kafka is not up, exit
     if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
         echo "❌ Kafka server not responding. Exiting test."
-        # Create status file to track the failure
-        echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
-        echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
-        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-        docker-compose -f $COMPOSE_FILE down
+        docker-compose -f docker-compose.yml down
+        return
+    fi
+
+    echo "Running comprehensive API compatibility tests..."
+    
+    # Copy Maven project files to container for Maven-based execution
+    echo "📦 Copying Maven project files to test container..."
+    docker cp pom.xml kafka-client-test:/tmp/
+    docker cp src/ kafka-client-test:/tmp/
+    
+    # Check if Maven project was copied successfully
+    if ! docker exec kafka-client-test test -f /tmp/pom.xml; then
+        echo "❌ Failed to copy Maven project files to container"
         return 1
     fi
     
-    # Run test operations
-    echo "Running API tests..."
-    
-    # Test 1: API Versions
-    echo "=== API Versions Test ==="
-    docker exec kafka-client-test kafka-broker-api-versions \
-        --bootstrap-server gateway:19092 || true
-    echo ""
-    
-    # Test 2: Topic operations
-    # topic replace . with _
-    echo "=== Topic Create Test ==="
-    TEST_TOPIC="version-compatibility-test-${test_id//./-}"
-    echo "Creating topic: $TEST_TOPIC"
-    docker exec kafka-client-test kafka-topics \
-        --bootstrap-server gateway:19092 \
-        --create --topic $TEST_TOPIC --partitions 1 2>/dev/null || true
-    
-    # Test 3: Producer
-    echo "=== Producer Test ==="
-    echo "Sending message: test-message-$test_id"
-    echo "test-message-$test_id" | docker exec -i kafka-client-test \
-        kafka-console-producer \
-        --bootstrap-server gateway:19092 \
-        --topic $TEST_TOPIC \
-        --property parse.key=false \
-        --property key.separator=: || {
-        echo "❌ Producer failed"
+    if ! docker exec kafka-client-test test -d /tmp/src; then
+        echo "❌ Failed to copy source files to container"
         return 1
-    }
+    fi
+    
+    echo "✅ Maven project files copied successfully"
+    
+    # Determine Java version and Maven settings based on Kafka client version
+    java_settings=""
+    if [[ "$client_ver" == "8.0.0" ]]; then
+        java_settings="export JAVA_HOME=/usr/lib/jvm/java-11-zulu-openjdk-ca && export PATH=\$JAVA_HOME/bin:\$PATH && "
+        maven_java_args="-Dmaven.compiler.source=11 -Dmaven.compiler.target=11"
+        echo "🔧 Using Java 11 for Kafka client $client_ver (required for 8.0.0+)"
+    else
+        maven_java_args="-Dmaven.compiler.source=8 -Dmaven.compiler.target=8"
+        echo "🔧 Using Java 8 for Kafka client $client_ver"
+    fi
 
-    echo "✅ Message sent successfully"
+    # Run comprehensive compatibility test suite  
+    echo "=== Running Comprehensive Kafka Test Suite ==="
     
-    # Test 4: Consumer
-    echo "=== Consumer Test ==="
-    echo "Reading messages from topic: $TEST_TOPIC"
-    timeout 10 docker exec kafka-client-test kafka-console-consumer \
-        --bootstrap-server gateway:19092 \
-        --from-beginning \
-        --topic $TEST_TOPIC \
-        --max-messages 1 \
-        --timeout-ms 8000 || true
-    echo ""
-    echo "Ignore FetchSessionHandler. It is not harmful."
+    # Test 1: PLAINTEXT authentication
+    echo "🔓 Testing PLAINTEXT authentication (gateway:19092)..."
+    docker exec kafka-client-test bash -c "
+        ${java_settings}cd /tmp && 
+        mvn test \
+            -DclientVersion=$client_ver \
+            -DserverVersion=$server_ver \
+            -Dkafka.version=$client_ver \
+            -Dbootstrap.servers=gateway:19092 \
+            -Dmaven.test.failure.ignore=false \
+            -Dmaven.surefire.reports.directory=/junit-results/plaintext \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            $maven_java_args \
+            -q
+    "
+    PLAINTEXT_EXIT_CODE=$?
     
-    # Test 5: Consumer groups
-    echo "=== Consumer Groups Test ==="
-    docker exec kafka-client-test kafka-consumer-groups \
-        --bootstrap-server gateway:19092 --list || true
-    echo ""
+    # Test 2: SASL_PLAINTEXT authentication with admin user
+    echo "🔐 Testing SASL_PLAINTEXT authentication with admin user (gateway:19095)..."
+    docker exec kafka-client-test bash -c "
+        ${java_settings}cd /tmp && 
+        KAFKA_SASL_ENABLED=true \
+        KAFKA_SASL_USERNAME=admin \
+        KAFKA_SASL_PASSWORD=admin-secret \
+        mvn test \
+            -DclientVersion=$client_ver \
+            -DserverVersion=$server_ver \
+            -Dkafka.version=$client_ver \
+            -Dbootstrap.servers=gateway:19095 \
+            -Dmaven.test.failure.ignore=false \
+            -Dmaven.surefire.reports.directory=/junit-results/sasl-admin \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            $maven_java_args \
+            -q
+    "
+    SASL_ADMIN_EXIT_CODE=$?
+    
+    # Test 3: SSL authentication (no SASL)
+    echo "🔒 Testing SSL authentication (gateway:19098)..."
+    docker exec kafka-client-test bash -c "
+        ${java_settings}cd /tmp && 
+        KAFKA_SSL_ENABLED=true \
+        mvn test \
+            -DclientVersion=$client_ver \
+            -DserverVersion=$server_ver \
+            -Dkafka.version=$client_ver \
+            -Dbootstrap.servers=gateway:19098 \
+            -Dmaven.test.failure.ignore=false \
+            -Dmaven.surefire.reports.directory=/junit-results/ssl \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            $maven_java_args \
+            -q
+    "
+    SSL_EXIT_CODE=$?
+    
+    # Overall test result evaluation
+    OVERALL_EXIT_CODE=0
+    if [ $PLAINTEXT_EXIT_CODE -ne 0 ]; then
+        OVERALL_EXIT_CODE=1
+        echo "❌ PLAINTEXT authentication tests failed"
+    else
+        echo "✅ PLAINTEXT authentication tests passed"
+    fi
+    
+    if [ $SASL_ADMIN_EXIT_CODE -ne 0 ]; then
+        OVERALL_EXIT_CODE=1
+        echo "❌ SASL authentication tests failed"
+    else
+        echo "✅ SASL authentication tests passed"
+    fi
+    
+    if [ $SSL_EXIT_CODE -ne 0 ]; then
+        OVERALL_EXIT_CODE=1
+        echo "❌ SSL authentication tests failed"
+    else
+        echo "✅ SSL authentication tests passed"
+    fi
+    
+    JUNIT_EXIT_CODE=$OVERALL_EXIT_CODE
+    
+    # Check JUnit test results
+    if [ $JUNIT_EXIT_CODE -eq 0 ]; then
+        echo "✅ JUnit tests passed for client $client_ver with server $server_ver"
+        
+        # Generate HTML reports from all authentication test results
+        docker exec kafka-client-test bash -c "
+            ${java_settings}cd /tmp && 
+            # Copy JUnit XML reports from all authentication modes to Surefire location
+            mkdir -p target/surefire-reports && \
+            cp /junit-results/plaintext/*.xml target/surefire-reports/ 2>/dev/null && \
+            cp /junit-results/sasl-admin/*.xml target/surefire-reports/ 2>/dev/null && \
+            cp /junit-results/ssl/*.xml target/surefire-reports/ 2>/dev/null && \
+            mvn surefire-report:report-only \
+                -Dkafka.version=$client_ver \
+                $maven_java_args \
+                -q && \
+            if [ -f target/site/surefire-report.html ]; then \
+                mkdir -p /html-results && \
+                cp -r target/site/* /html-results/; \
+                echo '📊 HTML report generated successfully with PLAINTEXT, SASL, and SSL authentication test details'; \
+            else \
+                echo '⚠️ HTML report not found'; \
+            fi
+        " 2>/dev/null || echo "⚠️ HTML report generation failed (non-critical)"
+    else
+        echo "❌ JUnit tests failed for client $client_ver with server $server_ver"
+        echo "   Check JUnit XML reports at: $JUNIT_RESULTS_DIR"
+        return 1
+    fi
     
     # Scrape metrics
     sleep 5
-    if curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"; then
-        # Create success status file
-        echo "SETUP_SUCCESS: Test completed successfully" > "$RESULTS_DIR/${test_id}_status.txt"
-        echo "FAILURE_TYPE: NONE" >> "$RESULTS_DIR/${test_id}_status.txt"
-        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-    else
-        # Failed to scrape metrics at the end
-        echo "SETUP_FAILED: Failed to scrape final metrics" > "$RESULTS_DIR/${test_id}_status.txt"
-        echo "FAILURE_TYPE: METRICS_SCRAPE_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
-        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
-    fi
+    curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
     
     # Cleanup
-    docker-compose -f $COMPOSE_FILE down
+    docker-compose -f docker-compose.yml down
     
     echo "Completed: $test_id"
 }
@@ -224,6 +360,27 @@ generate_final_report() {
     ls -la "$RESULTS_DIR"/*.txt "$RESULTS_DIR"/*.csv "$RESULTS_DIR"/*.json 2>/dev/null || echo "No reports generated"
 }
 
+# =============================================================================
+# JAVA APPLICATION BUILD AND TEST
+# =============================================================================
+
+build_java_test_applications() {
+    echo "🔨 Building Java test applications for all client versions..."
+    
+    # Make build script executable and run it
+    chmod +x build-test-applications.sh
+    ./build-test-applications.sh
+    
+    # Check if build was successful
+    if [ $? -eq 0 ]; then
+        echo "✅ Java test applications built successfully"
+        return 0
+    else
+        echo "❌ Failed to build Java test applications"
+        return 1
+    fi
+}
+
 # Main execution
 main() {
     client_count=${#CLIENTS[@]}
@@ -232,6 +389,8 @@ main() {
     echo "KAFKA CLIENT COMPATIBILITY TESTING"
     echo "Matrix: $client_count Java client versions × $server_count server versions = $total_combinations combinations"
     echo "Results: $RESULTS_DIR"
+    echo ""
+    echo "ℹ️  Tests will be compiled and run via Maven inside the test container"
     echo ""
     
     local test_count=0
