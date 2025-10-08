@@ -234,7 +234,7 @@ class EnhancedKroxyliciousMetricsParser:
       writer.writerows(self.results)
     return csv_file
 
-  def _generate_summary_report(self, output_dir, matrix):
+  def _generate_summary_report(self, output_dir, matrix, junit_results=None):
     """Generate summary report"""
     summary_file = os.path.join(output_dir, "compatibility_summary.txt")
     with open(summary_file, 'w') as f:
@@ -296,7 +296,13 @@ class EnhancedKroxyliciousMetricsParser:
           else:
             vc_status = "⚠️ NO_DATA"
           
-          f.write(f"  {vc_type:<12} | {vc_status} | Request Bytes: {int(vc_data['total_request_bytes']):<8} | Response Bytes: {int(vc_data['total_response_bytes']):<8} | Error Bytes: {int(vc_errors):<6} | Success: {len(vc_data['successful_apis']):<3} | Failed: {len(vc_data['failed_apis'])}\n")
+          # Get JUnit test results for this virtual cluster
+          junit_info = ""
+          if junit_results and key in junit_results and vc_type in junit_results[key]:
+            junit_data = junit_results[key][vc_type]
+            junit_info = f" | Tests: {junit_data['tests_run']} | Failures: {junit_data['failures']} | Errors: {junit_data['errors']} | Skipped: {junit_data['skipped']}"
+          
+          f.write(f"  {vc_type:<12} | {vc_status} | Request Bytes: {int(vc_data['total_request_bytes']):<8} | Response Bytes: {int(vc_data['total_response_bytes']):<8} | Error Bytes: {int(vc_errors):<6} | Success: {len(vc_data['successful_apis']):<3} | Failed: {len(vc_data['failed_apis'])}{junit_info}\n")
         
         f.write("\n")
         
@@ -327,7 +333,7 @@ class EnhancedKroxyliciousMetricsParser:
         f.write(f"{api_name:<30} -> {api_int}\n")
     return api_ref_file
 
-  def generate_reports(self, output_dir):
+  def generate_reports(self, output_dir, junit_results=None):
     """Generate all reports"""
     os.makedirs(output_dir, exist_ok=True)
 
@@ -339,7 +345,7 @@ class EnhancedKroxyliciousMetricsParser:
     print(f"Generated detailed CSV: {csv_file}")
 
     # Generate summary report
-    summary_file = self._generate_summary_report(output_dir, matrix)
+    summary_file = self._generate_summary_report(output_dir, matrix, junit_results)
     print(f"Generated summary report: {summary_file}")
 
     # Generate API reference
@@ -471,6 +477,64 @@ class EnhancedKroxyliciousMetricsParser:
     
     return json_file
 
+  def parse_junit_results(self, results_dir):
+    """Parse JUnit test results from TXT files"""
+    junit_results = {}
+    
+    # Look for JUnit result directories
+    for item in os.listdir(results_dir):
+      if item.endswith('_junit'):
+        # Extract client and server versions from directory name
+        match = re.match(r'java([^_]+)_server([^_]+)_junit', item)
+        if match:
+          client_version = match.group(1)
+          server_version = match.group(2)
+          key = f"{client_version}-{server_version}"
+          
+          junit_results[key] = {}
+          
+          # Parse each virtual cluster's test results
+          junit_dir = os.path.join(results_dir, item)
+          for vc_dir in os.listdir(junit_dir):
+            vc_path = os.path.join(junit_dir, vc_dir)
+            if os.path.isdir(vc_path):
+              # Look for TXT test result files
+              for file in os.listdir(vc_path):
+                if file.endswith('.txt'):
+                  txt_file = os.path.join(vc_path, file)
+                  try:
+                    with open(txt_file, 'r') as f:
+                      content = f.read()
+                    
+                    # Parse the test results line
+                    # Format: "Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 36.43 s"
+                    match = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)', content)
+                    if match:
+                      tests_run = int(match.group(1))
+                      failures = int(match.group(2))
+                      errors = int(match.group(3))
+                      skipped = int(match.group(4))
+                      
+                      # Map virtual cluster directory names to our standard names
+                      if 'sasl' in vc_dir:
+                        vc_name = 'SASL'
+                      elif 'ssl' in vc_dir:
+                        vc_name = 'SSL'
+                      else:
+                        vc_name = 'PLAINTEXT'
+                      
+                      junit_results[key][vc_name] = {
+                        'tests_run': tests_run,
+                        'failures': failures,
+                        'errors': errors,
+                        'skipped': skipped
+                      }
+                    
+                  except Exception as e:
+                    print(f"Warning: Error processing JUnit TXT file {txt_file}: {e}")
+    
+    return junit_results
+
 
 def main():
   if len(sys.argv) != 2:
@@ -489,9 +553,14 @@ def main():
     print("No results found to process")
     sys.exit(1)
 
+  # Parse JUnit test results
+  print("Parsing JUnit test results...")
+  junit_results = parser.parse_junit_results(results_dir)
+  print(f"Found JUnit results for {len(junit_results)} test combinations")
+
   # Generate reports
   output_dir = os.path.join(results_dir, "reports")
-  reports = parser.generate_reports(output_dir)
+  reports = parser.generate_reports(output_dir, junit_results)
 
   print(f"\nReports generated in: {output_dir}")
   for report_type, report_path in reports.items():
