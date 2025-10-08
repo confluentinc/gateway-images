@@ -1,5 +1,9 @@
 package com.confluent.kafka.testing;
 
+// Logging
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 // Kafka Clients - Producer
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -108,6 +112,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class AdvancedKafkaTest {
     
+    private static final Logger logger = LoggerFactory.getLogger(AdvancedKafkaTest.class);
+    
     private String bootstrapServers;
     private Properties baseProps;
     
@@ -135,8 +141,8 @@ public class AdvancedKafkaTest {
         boolean sslEnabled = "true".equalsIgnoreCase(enableSsl);
         
         if (sslEnabled && !saslEnabled) {
-            System.out.println("🔒 SSL authentication enabled (no SASL)");
-            System.out.println("   Bootstrap servers: " + this.bootstrapServers);
+            logger.info("🔒 SSL authentication enabled (no SASL)");
+            logger.info("   Bootstrap servers: {}", this.bootstrapServers);
             
             // Configure security protocol for SSL only
             this.baseProps.put("security.protocol", "SSL");
@@ -146,16 +152,16 @@ public class AdvancedKafkaTest {
             this.baseProps.put("ssl.truststore.location", "/etc/kafka/secrets/kafka.truststore.jks");
             this.baseProps.put("ssl.truststore.password", "confluent");
             
-            System.out.println("✅ SSL configuration applied to base properties");
+            logger.info("✅ SSL configuration applied to base properties");
         } else if (saslEnabled) {
             String mechanism = saslMechanism != null ? saslMechanism : "PLAIN";
             String username = saslUsername != null ? saslUsername : "admin";
             String password = saslPassword != null ? saslPassword : "admin-secret";
             
-            System.out.println("🔐 SASL authentication enabled");
-            System.out.println("   Mechanism: " + mechanism);
-            System.out.println("   Username: " + username);
-            System.out.println("   Bootstrap servers: " + this.bootstrapServers);
+            logger.info("🔐 SASL authentication enabled");
+            logger.info("   Mechanism: {}", mechanism);
+            logger.info("   Username: {}", username);
+            logger.info("   Bootstrap servers: {}", this.bootstrapServers);
             
             // Configure security protocol for SASL_PLAINTEXT
             this.baseProps.put("security.protocol", "SASL_PLAINTEXT");
@@ -169,9 +175,9 @@ public class AdvancedKafkaTest {
                 this.baseProps.put(SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
             }
             
-            System.out.println("✅ SASL configuration applied to base properties");
+            logger.info("✅ SASL configuration applied to base properties");
         } else {
-            System.out.println("🔓 Using PLAINTEXT authentication (no SASL)");
+            logger.info("🔓 Using PLAINTEXT authentication (no SASL)");
         }
     }
     
@@ -185,43 +191,43 @@ public class AdvancedKafkaTest {
     }
     
     public static void main(String[] args) {
-        System.out.println("🚀 Advanced Kafka Test Suite - Version: " + getKafkaVersion());
+        logger.info("🚀 Advanced Kafka Test Suite - Version: {}", getKafkaVersion());
         
         if (args.length < 2) {
-            System.out.println("Usage: java AdvancedKafkaTestSuite <bootstrap-servers> <test-type>");
-            System.out.println("");
-            System.out.println("Test types:");
-            System.out.println("  api            - Test API versions and admin connectivity");
-            System.out.println("  topics         - Test topic management (create/list/delete)");
-            System.out.println("  consumer-groups - Test consumer group operations");
-            System.out.println("  cluster        - Test cluster metadata and broker info");
-            System.out.println("  basic          - Test basic producer-consumer functionality");
-            System.out.println("  idempotent     - Test idempotent producer");
-            System.out.println("  eos            - Test exactly-once semantics");
-            System.out.println("  streams        - Test Streams API compatibility");
-            System.out.println("  serializers    - Test custom serializers");
-            System.out.println("  quotas         - Test quota handling");
-            System.out.println("  rate-limiting  - Test rate limiting behavior");
-            System.out.println("  admin          - Test advanced admin operations (configs, ACLs, partitions)");
-            System.out.println("  consumer       - Test advanced consumer operations (offsets, seek, pause/resume, lag)");
-            System.out.println("  compatibility  - Run all API compatibility tests");
-            System.out.println("  Note: Use 'mvn test' to run all tests via JUnit");
-            System.out.println("");
-            System.out.println("SASL Configuration (Environment Variables):");
-            System.out.println("  KAFKA_SASL_ENABLED=true     - Enable SASL authentication");
-            System.out.println("  KAFKA_SASL_MECHANISM=PLAIN  - SASL mechanism (default: PLAIN)");
-            System.out.println("  KAFKA_SASL_USERNAME=admin   - SASL username (default: admin)");
-            System.out.println("  KAFKA_SASL_PASSWORD=secret  - SASL password (default: admin-secret)");
-            System.out.println("");
-            System.out.println("Examples:");
-            System.out.println("  # PLAINTEXT connection:");
-            System.out.println("  java AdvancedKafkaTestSuite gateway:19092 basic");
-            System.out.println("");
-            System.out.println("  # SASL_PLAINTEXT connection:");
-            System.out.println("  KAFKA_SASL_ENABLED=true \\");
-            System.out.println("  KAFKA_SASL_USERNAME=alice \\");
-            System.out.println("  KAFKA_SASL_PASSWORD=alice-secret \\");
-            System.out.println("  java AdvancedKafkaTestSuite gateway:19093 basic");
+            logger.info("Usage: java AdvancedKafkaTestSuite <bootstrap-servers> <test-type>");
+            logger.info("");
+            logger.info("Test types:");
+            logger.info("  api            - Test API versions and admin connectivity");
+            logger.info("  topics         - Test topic management (create/list/delete)");
+            logger.info("  consumer-groups - Test consumer group operations");
+            logger.info("  cluster        - Test cluster metadata and broker info");
+            logger.info("  basic          - Test basic producer-consumer functionality");
+            logger.info("  idempotent     - Test idempotent producer");
+            logger.info("  eos            - Test exactly-once semantics");
+            logger.info("  streams        - Test Streams API compatibility");
+            logger.info("  serializers    - Test custom serializers");
+            logger.info("  quotas         - Test quota handling");
+            logger.info("  rate-limiting  - Test rate limiting behavior");
+            logger.info("  admin          - Test advanced admin operations (configs, ACLs, partitions)");
+            logger.info("  consumer       - Test advanced consumer operations (offsets, seek, pause/resume, lag)");
+            logger.info("  compatibility  - Run all API compatibility tests");
+            logger.info("  Note: Use 'mvn test' to run all tests via JUnit");
+            logger.info("");
+            logger.info("SASL Configuration (Environment Variables):");
+            logger.info("  KAFKA_SASL_ENABLED=true     - Enable SASL authentication");
+            logger.info("  KAFKA_SASL_MECHANISM=PLAIN  - SASL mechanism (default: PLAIN)");
+            logger.info("  KAFKA_SASL_USERNAME=admin   - SASL username (default: admin)");
+            logger.info("  KAFKA_SASL_PASSWORD=secret  - SASL password (default: admin-secret)");
+            logger.info("");
+            logger.info("Examples:");
+            logger.info("  # PLAINTEXT connection:");
+            logger.info("  java AdvancedKafkaTestSuite gateway:19092 basic");
+            logger.info("");
+            logger.info("  # SASL_PLAINTEXT connection:");
+            logger.info("  KAFKA_SASL_ENABLED=true \\");
+            logger.info("  KAFKA_SASL_USERNAME=alice \\");
+            logger.info("  KAFKA_SASL_PASSWORD=alice-secret \\");
+            logger.info("  java AdvancedKafkaTestSuite gateway:19093 basic");
             System.exit(1);
         }
         
@@ -276,13 +282,13 @@ public class AdvancedKafkaTest {
                     suite.runCompatibilityTests();
                     break;
                 default:
-                    System.out.println("❌ Unknown test type: " + testType);
-                    System.out.println("💡 Tip: Use 'mvn test' to run all JUnit tests");
+                    logger.error("❌ Unknown test type: {}", testType);
+                    logger.info("💡 Tip: Use 'mvn test' to run all JUnit tests");
                     System.exit(1);
             }
-            System.out.println("✅ Test '" + testType + "' completed successfully with Kafka client: " + getKafkaVersion());
+            logger.info("✅ Test '{}' completed successfully with Kafka client: {}", testType, getKafkaVersion());
         } catch (Exception e) {
-            System.err.println("❌ Test '" + testType + "' failed: " + e.getMessage());
+            logger.error("❌ Test '{}' failed: {}", testType, e.getMessage());
             e.printStackTrace();
             System.exit(1);
         }
@@ -330,12 +336,12 @@ public class AdvancedKafkaTest {
             java.lang.reflect.Method allMethod = alterResult.getClass().getMethod("all");
             org.apache.kafka.common.KafkaFuture<?> allFuture = (org.apache.kafka.common.KafkaFuture<?>) allMethod.invoke(alterResult);
             allFuture.get(10, java.util.concurrent.TimeUnit.SECONDS);
-            System.out.println("✅ Topic configuration altered successfully");
+            logger.info("✅ Topic configuration altered successfully");
         } catch (NoSuchMethodException e) {
             // Method doesn't exist in 8.0.0+, use alternative approach or skip
-            System.out.println("⚠️ alterConfigs not available in this Kafka version - skipping config alteration");
+            logger.warn("⚠️ alterConfigs not available in this Kafka version - skipping config alteration");
         } catch (Exception e) {
-            System.out.println("⚠️ Topic config alteration failed: " + e.getMessage());
+            logger.warn("⚠️ Topic config alteration failed: {}", e.getMessage());
         }
     }
     
@@ -343,7 +349,7 @@ public class AdvancedKafkaTest {
     @Order(2)
     @DisplayName("Basic Producer-Consumer Test")
     public void testBasicProducerConsumer() throws Exception {
-        System.out.println("🔄 Testing Basic Producer-Consumer...");
+        logger.info("🔄 Testing Basic Producer-Consumer...");
         
         String topicName = "basic-test-topic-" + System.currentTimeMillis();
         String testMessage = "basic-message-" + System.currentTimeMillis();
@@ -366,9 +372,8 @@ public class AdvancedKafkaTest {
             assertTrue(metadata.partition() >= 0, "Partition should be non-negative");
             assertTrue(metadata.offset() >= 0, "Offset should be non-negative");
             
-            System.out.println("✅ Message sent to topic: " + metadata.topic() + 
-                             ", partition: " + metadata.partition() + 
-                             ", offset: " + metadata.offset());
+            logger.info("✅ Message sent to topic: {}, partition: {}, offset: {}", 
+                       metadata.topic(), metadata.partition(), metadata.offset());
         }
         
         // Test Consumer
@@ -400,10 +405,8 @@ public class AdvancedKafkaTest {
                     assertTrue(record.offset() >= 0, "Consumer record offset should be non-negative");
                     
                     foundMessage = true;
-                    System.out.println("✅ Message consumed: key=" + record.key() + 
-                                     ", value=" + record.value() + 
-                                     ", partition=" + record.partition() + 
-                                     ", offset=" + record.offset());
+                    logger.info("✅ Message consumed: key={}, value={}, partition={}, offset={}", 
+                               record.key(), record.value(), record.partition(), record.offset());
                 }
             }
             
@@ -411,7 +414,7 @@ public class AdvancedKafkaTest {
             assertTrue(foundMessage, "Should have consumed at least one message within timeout");
             assertTrue(messageCount > 0, "Message count should be greater than 0");
             
-            System.out.println("✅ Basic producer-consumer test completed successfully");
+            logger.info("✅ Basic producer-consumer test completed successfully");
         }
     }
     
@@ -419,7 +422,7 @@ public class AdvancedKafkaTest {
     @Order(4)
     @DisplayName("Idempotent Producer Test")
     public void testIdempotentProducer() throws Exception {
-        System.out.println("🔁 Testing Idempotent Producer...");
+        logger.info("🔁 Testing Idempotent Producer...");
         
         String topicName = "idempotent-test-topic-" + System.currentTimeMillis();
         
@@ -451,7 +454,7 @@ public class AdvancedKafkaTest {
                 assertTrue(metadata.offset() >= 0, "Offset should be non-negative for message " + (i+1));
                 
                 metadataList.add(metadata);
-                System.out.println("📤 Sent idempotent message " + (i+1) + " to offset: " + metadata.offset());
+                logger.info("📤 Sent idempotent message {} to offset: {}", (i+1), metadata.offset());
             }
         }
         
@@ -464,14 +467,14 @@ public class AdvancedKafkaTest {
                       "Message " + (i+1) + " should have higher offset than message " + i);
         }
         
-        System.out.println("✅ Idempotent producer test completed");
+        logger.info("✅ Idempotent producer test completed");
     }
     
     @Test
     @Order(5)
     @DisplayName("Exactly-Once Semantics Test")
     public void testExactlyOnceSemantics() throws Exception {
-        System.out.println("🔄 Testing Exactly-Once Semantics...");
+        logger.info("🔄 Testing Exactly-Once Semantics...");
         
         String topicName = "eos-test-topic-" + System.currentTimeMillis();
         String transactionId = "eos-test-" + System.currentTimeMillis();
@@ -507,7 +510,7 @@ public class AdvancedKafkaTest {
                 // JUnit assertion - commit should not throw exception
                 assertDoesNotThrow(() -> producer.commitTransaction(), "Transaction commit should succeed");
                 commitSucceeded = true;
-                System.out.println("✅ Transaction committed successfully with 5 messages");
+                logger.info("✅ Transaction committed successfully with 5 messages");
             } catch (Exception e) {
                 producer.abortTransaction();
                 throw e;
@@ -522,11 +525,11 @@ public class AdvancedKafkaTest {
                 // JUnit assertion - abort should not throw exception
                 assertDoesNotThrow(() -> producer.abortTransaction(), "Transaction abort should succeed");
                 abortSucceeded = true;
-                System.out.println("✅ Transaction aborted successfully");
+                logger.info("✅ Transaction aborted successfully");
             } catch (Exception e) {
                 producer.abortTransaction();
                 abortSucceeded = true;
-                System.out.println("✅ Transaction aborted on exception: " + e.getMessage());
+                logger.info("✅ Transaction aborted on exception: {}", e.getMessage());
             }
         }
         
@@ -534,14 +537,14 @@ public class AdvancedKafkaTest {
         assertTrue(commitSucceeded, "Transaction commit should have succeeded");
         assertTrue(abortSucceeded, "Transaction abort should have succeeded");
         
-        System.out.println("✅ Exactly-Once Semantics test completed");
+        logger.info("✅ Exactly-Once Semantics test completed");
     }
     
     @Test
     @Order(6)
     @DisplayName("Kafka Streams Compatibility Test")
     public void testStreamsCompatibility() throws Exception {
-        System.out.println("🌊 Testing Streams API Compatibility...");
+        logger.info("🌊 Testing Streams API Compatibility...");
         
         String inputTopic = "streams-input-" + System.currentTimeMillis();
         String outputTopic = "streams-output-" + System.currentTimeMillis();
@@ -560,7 +563,7 @@ public class AdvancedKafkaTest {
             );
             CreateTopicsResult createResult = adminClient.createTopics(topics);
             createResult.all().get(10, TimeUnit.SECONDS);
-            System.out.println("✅ Pre-created input and output topics");
+            logger.info("✅ Pre-created input and output topics");
             Thread.sleep(1000); // Allow topics to be fully propagated
         }
         
@@ -586,7 +589,7 @@ public class AdvancedKafkaTest {
         Topology topology = builder.build();
         assertNotNull(topology, "Topology should not be null");
         assertNotNull(topology.describe(), "Topology description should not be null");
-        System.out.println("📋 Streams topology: " + topology.describe());
+        logger.info("📋 Streams topology: {}", topology.describe());
         
         boolean streamStarted = false;
         boolean messageSent = false;
@@ -597,7 +600,7 @@ public class AdvancedKafkaTest {
             final String[] lastState = {"CREATED"};
             
             streams.setStateListener((newState, oldState) -> {
-                System.out.println("🔄 Streams state changed from " + oldState + " to " + newState);
+                logger.info("🔄 Streams state changed from {} to {}", oldState, newState);
                 lastState[0] = newState.toString();
                 if (newState == KafkaStreams.State.RUNNING) {
                     runningStateReached[0] = true;
@@ -627,7 +630,7 @@ public class AdvancedKafkaTest {
             assertTrue(runningStateReached[0], 
                       "Streams should reach RUNNING state within " + (maxWaitMs/1000) + " seconds. " +
                       "Last state: " + lastState[0] + ", Current state: " + streams.state());
-            System.out.println("✅ Streams reached RUNNING state");
+            logger.info("✅ Streams reached RUNNING state");
             
             // Send test message to input topic
             Properties producerProps = new Properties();
@@ -642,7 +645,7 @@ public class AdvancedKafkaTest {
                 RecordMetadata metadata = producer.send(record).get(5, TimeUnit.SECONDS);
                 assertNotNull(metadata, "Producer metadata should not be null");
                 messageSent = true;
-                System.out.println("📤 Test message sent to streams input topic");
+                logger.info("📤 Test message sent to streams input topic");
             }
             
             // Let streams process
@@ -667,7 +670,7 @@ public class AdvancedKafkaTest {
                         assertNotNull(record.value(), "Output record value should not be null");
                         assertEquals("PROCESSED: " + testMessage.toUpperCase(), record.value(), 
                                    "Message should be transformed to uppercase with prefix");
-                        System.out.println("✅ Processed message verified: " + record.value());
+                        logger.info("✅ Processed message verified: {}", record.value());
                         messageProcessed = true;
                         break;
                     }
@@ -675,7 +678,7 @@ public class AdvancedKafkaTest {
             }
             
             streams.close(Duration.ofSeconds(10));
-            System.out.println("✅ Streams closed successfully");
+            logger.info("✅ Streams closed successfully");
         }
         
         // Final assertions
@@ -683,14 +686,14 @@ public class AdvancedKafkaTest {
         assertTrue(messageSent, "Test message should have been sent");
         assertTrue(messageProcessed, "Message should have been processed and verified in output topic");
         
-        System.out.println("✅ Streams API compatibility test completed with all assertions passed");
+        logger.info("✅ Streams API compatibility test completed with all assertions passed");
     }
     
     @Test
     @Order(7)
     @DisplayName("Custom Serializers Test")
     public void testCustomSerializers() throws Exception {
-        System.out.println("🛠️ Testing Custom Serializers...");
+        logger.info("🛠️ Testing Custom Serializers...");
         
         String topicName = "custom-serializer-topic-" + System.currentTimeMillis();
         
@@ -716,10 +719,10 @@ public class AdvancedKafkaTest {
             assertTrue(metadata.partition() >= 0, "Partition should be non-negative");
             assertTrue(metadata.offset() >= 0, "Offset should be non-negative");
             
-            System.out.println("✅ Custom serializer message sent: " + sentMessage + 
-                             " (serialized to " + messageBytes.length + " bytes)");
-            System.out.println("📍 Sent to partition: " + metadata.partition() + 
-                             ", offset: " + metadata.offset());
+            logger.info("✅ Custom serializer message sent: {} (serialized to {} bytes)", 
+                       sentMessage, messageBytes.length);
+            logger.info("📍 Sent to partition: {}, offset: {}", 
+                       metadata.partition(), metadata.offset());
         }
         
         // Test consumption with ByteArray deserializer
@@ -753,7 +756,7 @@ public class AdvancedKafkaTest {
                     // JUnit assertion for message content
                     assertEquals(sentMessage, receivedMessage, "Deserialized message should match original");
                     
-                    System.out.println("✅ Custom deserializer message received: " + receivedMessage);
+                    logger.info("✅ Custom deserializer message received: {}", receivedMessage);
                     messageReceived = true;
                 }
             }
@@ -762,7 +765,7 @@ public class AdvancedKafkaTest {
             assertTrue(messageReceived, "Should have received at least one message with custom deserializers within timeout");
             assertNotNull(receivedMessage, "Received message should not be null");
             
-            System.out.println("✅ Custom serializers test completed successfully");
+            logger.info("✅ Custom serializers test completed successfully");
         }
     }
     
@@ -770,7 +773,7 @@ public class AdvancedKafkaTest {
     @Order(8)
     @DisplayName("Quotas Handling Test")
     public void testQuotasHandling() throws Exception {
-        System.out.println("📊 Testing Quotas Handling...");
+        logger.info("📊 Testing Quotas Handling...");
         
         String topicName = "quota-test-topic-" + System.currentTimeMillis();
         
@@ -788,7 +791,7 @@ public class AdvancedKafkaTest {
             long startTime = System.currentTimeMillis();
             int messageCount = 100;
             
-            System.out.println("📤 Sending " + messageCount + " messages rapidly to test quota handling...");
+            logger.info("📤 Sending " + messageCount + " messages rapidly to test quota handling...");
             
             List<Future<RecordMetadata>> futures = new ArrayList<>();
             
@@ -827,11 +830,11 @@ public class AdvancedKafkaTest {
             // Most messages should succeed (quotas may or may not be applied depending on configuration)
             assertTrue(successCount > 0, "At least some messages should succeed");
             
-            System.out.println("✅ Quota test completed:");
-            System.out.println("   📊 Messages sent successfully: " + successCount);
-            System.out.println("   ⏱️ Messages throttled: " + throttledCount);
-            System.out.println("   🕐 Total duration: " + duration + "ms");
-            System.out.println("   📈 Throughput: " + (messageCount * 1000.0 / duration) + " messages/sec");
+            logger.info("✅ Quota test completed:");
+            logger.info("   📊 Messages sent successfully: " + successCount);
+            logger.info("   ⏱️ Messages throttled: " + throttledCount);
+            logger.info("   🕐 Total duration: " + duration + "ms");
+            logger.info("   📈 Throughput: " + (messageCount * 1000.0 / duration) + " messages/sec");
         }
     }
     
@@ -839,7 +842,7 @@ public class AdvancedKafkaTest {
     @Order(9)
     @DisplayName("Rate Limiting Test")
     public void testRateLimiting() throws Exception {
-        System.out.println("⏱️ Testing Rate Limiting Behavior...");
+        logger.info("⏱️ Testing Rate Limiting Behavior...");
         
         String topicName = "rate-limit-topic-" + System.currentTimeMillis();
         
@@ -863,7 +866,7 @@ public class AdvancedKafkaTest {
         try (Producer<String, String> producer = new KafkaProducer<>(producerProps)) {
             long totalStartTime = System.currentTimeMillis();
             
-            System.out.println("📤 Sending " + batchCount + " batches of " + messagesPerBatch + 
+            logger.info("📤 Sending " + batchCount + " batches of " + messagesPerBatch + 
                              " messages each with controlled timing...");
             
             List<Future<RecordMetadata>> allFutures = new ArrayList<>();
@@ -889,7 +892,7 @@ public class AdvancedKafkaTest {
                 assertTrue(batchDuration >= 0, "Batch duration should be non-negative");
                 assertTrue(batchDuration < 30000, "Batch should complete within 30 seconds");
                 
-                System.out.println("   📊 Batch " + (batch + 1) + " sent in " + batchDuration + "ms");
+                logger.info("   📊 Batch " + (batch + 1) + " sent in " + batchDuration + "ms");
                 
                 if (batch < batchCount - 1) {
                     Thread.sleep(1000); // 1 second between batches
@@ -921,11 +924,11 @@ public class AdvancedKafkaTest {
             double throughput = totalMessages * 1000.0 / totalDuration;
             assertTrue(throughput > 0, "Throughput should be positive");
             
-            System.out.println("✅ Rate limiting test completed:");
-            System.out.println("   📊 Total messages sent: " + totalMessages);
-            System.out.println("   ✅ Successful sends: " + successCount);
-            System.out.println("   🕐 Total duration: " + totalDuration + "ms");
-            System.out.println("   📈 Average throughput: " + throughput + " messages/sec");
+            logger.info("✅ Rate limiting test completed:");
+            logger.info("   📊 Total messages sent: " + totalMessages);
+            logger.info("   ✅ Successful sends: " + successCount);
+            logger.info("   🕐 Total duration: " + totalDuration + "ms");
+            logger.info("   📈 Average throughput: " + throughput + " messages/sec");
         }
     }
     
@@ -933,7 +936,7 @@ public class AdvancedKafkaTest {
     @Order(10)
     @DisplayName("API Versions Test")
     public void testAPIVersions() throws Exception {
-        System.out.println("🔌 Testing API Versions...");
+        logger.info("🔌 Testing API Versions...");
         
         Properties adminProps = new Properties();
         adminProps.putAll(baseProps);
@@ -956,9 +959,9 @@ public class AdvancedKafkaTest {
             assertNotNull(controller, "Controller should not be null");
             assertTrue(controller.id() >= 0, "Controller ID should be non-negative");
             
-            System.out.println("✅ Cluster ID: " + clusterId);
-            System.out.println("✅ Broker nodes: " + nodes.size());
-            System.out.println("✅ Controller: " + controller.id() + " (" + controller.host() + ":" + controller.port() + ")");
+            logger.info("✅ Cluster ID: " + clusterId);
+            logger.info("✅ Broker nodes: " + nodes.size());
+            logger.info("✅ Controller: " + controller.id() + " (" + controller.host() + ":" + controller.port() + ")");
             
             // Test basic admin API functionality
             ListTopicsResult topicsResult = adminClient.listTopics();
@@ -968,8 +971,8 @@ public class AdvancedKafkaTest {
             assertNotNull(topicNames, "Topic names set should not be null");
             assertTrue(topicNames.size() >= 0, "Topic count should be non-negative");
             
-            System.out.println("✅ Topics available: " + topicNames.size());
-            System.out.println("✅ API Versions test completed - all admin APIs accessible");
+            logger.info("✅ Topics available: " + topicNames.size());
+            logger.info("✅ API Versions test completed - all admin APIs accessible");
         }
     }
     
@@ -977,7 +980,7 @@ public class AdvancedKafkaTest {
     @Order(11)
     @DisplayName("Topic Management Test")
     public void testTopicManagement() throws Exception {
-        System.out.println("📋 Testing Topic Management...");
+        logger.info("📋 Testing Topic Management...");
         
         Properties adminProps = new Properties();
         adminProps.putAll(baseProps);
@@ -994,7 +997,7 @@ public class AdvancedKafkaTest {
             assertNotNull(adminClient, "AdminClient should not be null");
             
             // Create topic
-            System.out.println("Creating topic: " + testTopicName);
+            logger.info("Creating topic: " + testTopicName);
             NewTopic newTopic = new NewTopic(testTopicName, 1, (short) 1);
             CreateTopicsResult createResult = adminClient.createTopics(Collections.singletonList(newTopic));
             assertNotNull(createResult, "CreateTopicsResult should not be null");
@@ -1002,7 +1005,7 @@ public class AdvancedKafkaTest {
             // This will throw an exception if creation fails
             createResult.all().get(10, TimeUnit.SECONDS);
             topicCreated = true;
-            System.out.println("✅ Topic created successfully");
+            logger.info("✅ Topic created successfully");
             
             // Wait a bit for topic to be fully propagated
             Thread.sleep(1000);
@@ -1016,7 +1019,7 @@ public class AdvancedKafkaTest {
             assertTrue(topics.size() > 0, "Should have at least one topic");
             assertTrue(topics.contains(testTopicName), "Topic list should contain newly created topic");
             topicFoundInList = true;
-            System.out.println("✅ Topic found in topic list (total topics: " + topics.size() + ")");
+            logger.info("✅ Topic found in topic list (total topics: " + topics.size() + ")");
             
             // Describe topic
             DescribeTopicsResult describeResult = adminClient.describeTopics(Collections.singletonList(testTopicName));
@@ -1028,7 +1031,7 @@ public class AdvancedKafkaTest {
             assertEquals(1, topicDesc.partitions().size(), "Topic should have exactly 1 partition");
             assertEquals(testTopicName, topicDesc.name(), "Topic name should match");
             topicDescribed = true;
-            System.out.println("✅ Topic described: " + topicDesc.partitions().size() + " partitions");
+            logger.info("✅ Topic described: " + topicDesc.partitions().size() + " partitions");
             
             // Delete topic
             DeleteTopicsResult deleteResult = adminClient.deleteTopics(Collections.singletonList(testTopicName));
@@ -1037,7 +1040,7 @@ public class AdvancedKafkaTest {
             // This will throw an exception if deletion fails
             deleteResult.all().get(10, TimeUnit.SECONDS);
             topicDeleted = true;
-            System.out.println("✅ Topic deleted successfully");
+            logger.info("✅ Topic deleted successfully");
             
             // Wait a bit and verify topic is gone
             Thread.sleep(1000);
@@ -1045,7 +1048,7 @@ public class AdvancedKafkaTest {
             Set<String> topicsAfterDelete = listAfterDelete.names().get(10, TimeUnit.SECONDS);
             assertFalse(topicsAfterDelete.contains(testTopicName), 
                        "Topic should not exist after deletion");
-            System.out.println("✅ Verified topic no longer exists after deletion");
+            logger.info("✅ Verified topic no longer exists after deletion");
         }
         
         // Final assertions
@@ -1054,14 +1057,14 @@ public class AdvancedKafkaTest {
         assertTrue(topicDescribed, "Topic should have been described");
         assertTrue(topicDeleted, "Topic deletion should have succeeded");
         
-        System.out.println("✅ Topic management test completed with all assertions passed");
+        logger.info("✅ Topic management test completed with all assertions passed");
     }
     
     @Test
     @Order(12)
     @DisplayName("Consumer Groups Test")
     public void testConsumerGroups() throws Exception {
-        System.out.println("👥 Testing Consumer Groups...");
+        logger.info("👥 Testing Consumer Groups...");
         
         Properties adminProps = new Properties();
         adminProps.putAll(baseProps);
@@ -1078,10 +1081,10 @@ public class AdvancedKafkaTest {
             Collection<ConsumerGroupListing> groups = groupsResult.all().get(10, TimeUnit.SECONDS);
             assertNotNull(groups, "Consumer groups collection should not be null");
             
-            System.out.println("✅ Consumer groups found: " + groups.size());
+            logger.info("✅ Consumer groups found: " + groups.size());
             
             if (!groups.isEmpty()) {
-                System.out.println("Consumer groups:");
+                logger.info("Consumer groups:");
                 
                 int validGroupCount = 0;
                 for (ConsumerGroupListing group : groups) {
@@ -1114,11 +1117,11 @@ public class AdvancedKafkaTest {
                             typeStr = "UNKNOWN";
                         }
                         
-                        System.out.println("  - Group ID: " + group.groupId() + 
+                        logger.info("  - Group ID: " + group.groupId() + 
                                          ", State: " + stateStr +
                                          ", Type: " + typeStr);
                     } catch (Exception e) {
-                        System.out.println("  - Group ID: " + group.groupId() + " (details unavailable)");
+                        logger.info("  - Group ID: " + group.groupId() + " (details unavailable)");
                     }
                 }
                 
@@ -1144,15 +1147,15 @@ public class AdvancedKafkaTest {
                 assertNotNull(groupDesc.coordinator(), "Group coordinator should not be null");
                 assertTrue(groupDesc.coordinator().id() >= 0, "Coordinator ID should be non-negative");
                 
-                System.out.println("✅ Group details for '" + firstGroupId + "':");
-                System.out.println("   Members: " + groupDesc.members().size());
-                System.out.println("   State: " + groupDesc.state());
-                System.out.println("   Coordinator: " + groupDesc.coordinator().id());
+                logger.info("✅ Group details for '" + firstGroupId + "':");
+                logger.info("   Members: " + groupDesc.members().size());
+                logger.info("   State: " + groupDesc.state());
+                logger.info("   Coordinator: " + groupDesc.coordinator().id());
             } else {
-                System.out.println("ℹ️ No consumer groups currently active - this is valid but no groups to test");
+                logger.info("ℹ️ No consumer groups currently active - this is valid but no groups to test");
             }
             
-            System.out.println("✅ Consumer groups test completed with all assertions passed");
+            logger.info("✅ Consumer groups test completed with all assertions passed");
         }
     }
     
@@ -1160,7 +1163,7 @@ public class AdvancedKafkaTest {
     @Order(13)
     @DisplayName("Cluster Metadata Test")
     public void testClusterMetadata() throws Exception {
-        System.out.println("🌐 Testing Cluster Metadata...");
+        logger.info("🌐 Testing Cluster Metadata...");
         
         Properties adminProps = new Properties();
         adminProps.putAll(baseProps);
@@ -1189,12 +1192,12 @@ public class AdvancedKafkaTest {
             assertFalse(controller.host().isEmpty(), "Controller host should not be empty");
             assertTrue(controller.port() > 0, "Controller port should be positive");
             
-            System.out.println("✅ Cluster Metadata:");
-            System.out.println("   Cluster ID: " + clusterId);
-            System.out.println("   Controller Node: " + controller.id() + " (" + controller.host() + ":" + controller.port() + ")");
-            System.out.println("   Total Brokers: " + nodes.size());
+            logger.info("✅ Cluster Metadata:");
+            logger.info("   Cluster ID: " + clusterId);
+            logger.info("   Controller Node: " + controller.id() + " (" + controller.host() + ":" + controller.port() + ")");
+            logger.info("   Total Brokers: " + nodes.size());
             
-            System.out.println("   Broker Details:");
+            logger.info("   Broker Details:");
             int validNodeCount = 0;
             for (Node node : nodes) {
                 assertNotNull(node, "Node should not be null");
@@ -1203,7 +1206,7 @@ public class AdvancedKafkaTest {
                 assertFalse(node.host().isEmpty(), "Node host should not be empty");
                 assertTrue(node.port() > 0, "Node port should be positive");
                 
-                System.out.println("     - Broker " + node.id() + ": " + node.host() + ":" + node.port() + 
+                logger.info("     - Broker " + node.id() + ": " + node.host() + ":" + node.port() + 
                                  (node.hasRack() ? " (rack: " + node.rack() + ")" : ""));
                 validNodeCount++;
             }
@@ -1220,8 +1223,8 @@ public class AdvancedKafkaTest {
             }
             assertTrue(controllerFound, "Controller should be one of the broker nodes");
             
-            System.out.println("ℹ️ Broker configuration details skipped for cross-version compatibility");
-            System.out.println("✅ Cluster metadata test completed with all assertions passed");
+            logger.info("ℹ️ Broker configuration details skipped for cross-version compatibility");
+            logger.info("✅ Cluster metadata test completed with all assertions passed");
         }
     }
     
@@ -1229,7 +1232,7 @@ public class AdvancedKafkaTest {
     @Order(1)
     @DisplayName("Kafka API Compatibility Test Suite")
     public void runCompatibilityTests() throws Exception {
-        System.out.println("🔄 Running Compatibility Test Suite (API-focused)...");
+        logger.info("🔄 Running Compatibility Test Suite (API-focused)...");
         
         // Run all API tests that mirror the version-compatibility.sh script
         testAPIVersions();
@@ -1246,14 +1249,14 @@ public class AdvancedKafkaTest {
         
         testClusterMetadata();
         
-        System.out.println("🎉 Compatibility test suite completed!");
+        logger.info("🎉 Compatibility test suite completed!");
     }
     
     @Test
     @Order(3)
     @DisplayName("Admin Operations Test")
     public void testAdminOperations() throws Exception {
-        System.out.println("🔧 Testing Admin Operations...");
+        logger.info("🔧 Testing Admin Operations...");
         
         Properties adminProps = new Properties();
         adminProps.putAll(baseProps);
@@ -1273,18 +1276,18 @@ public class AdvancedKafkaTest {
             assertNotNull(adminClient, "AdminClient should not be null");
             
             // 1. Create topic for testing admin operations
-            System.out.println("📝 Creating topic for admin operations testing: " + testTopicName);
+            logger.info("📝 Creating topic for admin operations testing: " + testTopicName);
             NewTopic newTopic = new NewTopic(testTopicName, 2, (short) 1); // 2 partitions initially
             CreateTopicsResult createResult = adminClient.createTopics(Collections.singletonList(newTopic));
             assertNotNull(createResult, "CreateTopicsResult should not be null");
             createResult.all().get(15, TimeUnit.SECONDS);
             topicCreated = true;
-            System.out.println("✅ Topic created with 2 partitions");
+            logger.info("✅ Topic created with 2 partitions");
             
             Thread.sleep(1000); // Allow topic to be fully created
             
             // 2. Alter topic configs (optional - may not be supported in all versions)
-            System.out.println("⚙️ Testing topic configuration alterations...");
+            logger.info("⚙️ Testing topic configuration alterations...");
             try {
                 Map<ConfigResource, Config> configsToAlter = new HashMap<>();
                 ConfigResource topicResource = new ConfigResource(ConfigResource.Type.TOPIC, testTopicName);
@@ -1297,14 +1300,14 @@ public class AdvancedKafkaTest {
                 configsToAlter.put(topicResource, config);
                 
                 alterTopicConfig(adminClient, configsToAlter);
-                System.out.println("✅ Config alteration attempted (may be skipped in some versions)");
+                logger.info("✅ Config alteration attempted (may be skipped in some versions)");
             } catch (Exception e) {
-                System.out.println("⚠️ Topic config alteration not fully supported: " + e.getMessage());
+                logger.info("⚠️ Topic config alteration not fully supported: " + e.getMessage());
                 // Don't fail test - config alteration is optional
             }
             
             // 3. Describe configs
-            System.out.println("📖 Testing configuration description...");
+            logger.info("📖 Testing configuration description...");
             ConfigResource topicResource = new ConfigResource(ConfigResource.Type.TOPIC, testTopicName);
             DescribeConfigsResult describeResult = adminClient.describeConfigs(Collections.singletonList(topicResource));
             assertNotNull(describeResult, "DescribeConfigsResult should not be null");
@@ -1315,19 +1318,19 @@ public class AdvancedKafkaTest {
             assertTrue(topicConfig.entries().size() > 0, "Should have at least one config entry");
             configDescribed = true;
             
-            System.out.println("✅ Topic configuration retrieved:");
-            System.out.println("   Total config entries: " + topicConfig.entries().size());
+            logger.info("✅ Topic configuration retrieved:");
+            logger.info("   Total config entries: " + topicConfig.entries().size());
             
             // Show a few key configs
             for (ConfigEntry entry : topicConfig.entries()) {
                 if (entry.name().equals("retention.ms") || entry.name().equals("segment.ms")) {
                     assertNotNull(entry.value(), "Config value for " + entry.name() + " should not be null");
-                    System.out.println("   " + entry.name() + ": " + entry.value());
+                    logger.info("   " + entry.name() + ": " + entry.value());
                 }
             }
             
             // 4. Alter partition count
-            System.out.println("📊 Testing partition count alteration...");
+            logger.info("📊 Testing partition count alteration...");
             Map<String, NewPartitions> partitionUpdates = new HashMap<>();
             partitionUpdates.put(testTopicName, NewPartitions.increaseTo(4)); // Increase to 4 partitions
             
@@ -1343,10 +1346,10 @@ public class AdvancedKafkaTest {
             assertNotNull(topicDesc, "Topic description should not be null");
             assertEquals(4, topicDesc.partitions().size(), "Topic should have 4 partitions after alteration");
             partitionsIncreased = true;
-            System.out.println("✅ Partition count increased from 2 to " + topicDesc.partitions().size());
+            logger.info("✅ Partition count increased from 2 to " + topicDesc.partitions().size());
             
             // 5. Delete records (truncate topic)
-            System.out.println("🗑️ Testing record deletion...");
+            logger.info("🗑️ Testing record deletion...");
             
             // First, produce some test records specifically to partition 0
             Properties producerProps = new Properties();
@@ -1368,7 +1371,7 @@ public class AdvancedKafkaTest {
                 }
                 assertEquals(10, messagesProduced, "Should have produced exactly 10 messages");
                 recordsProduced = true;
-                System.out.println("   Produced 10 test messages to partition 0");
+                logger.info("   Produced 10 test messages to partition 0");
             }
             
             // Get current end offset for partition 0 to ensure we have data
@@ -1387,7 +1390,7 @@ public class AdvancedKafkaTest {
                 Map<TopicPartition, Long> endOffsets = tempConsumer.endOffsets(Collections.singleton(partition0));
                 endOffset = endOffsets.get(partition0);
                 assertTrue(endOffset >= 10, "Partition 0 should have at least 10 messages (has " + endOffset + ")");
-                System.out.println("   Partition 0 current end offset: " + endOffset);
+                logger.info("   Partition 0 current end offset: " + endOffset);
             }
             
             // Delete records up to offset 5 on partition 0 (only if we have enough messages)
@@ -1400,10 +1403,10 @@ public class AdvancedKafkaTest {
                 assertNotNull(deleteRecordsResult, "DeleteRecordsResult should not be null");
                 deleteRecordsResult.all().get(10, TimeUnit.SECONDS);
                 recordsDeleted = true;
-                System.out.println("✅ Records deleted up to offset " + offsetToDelete + " on partition 0");
+                logger.info("✅ Records deleted up to offset " + offsetToDelete + " on partition 0");
             } else {
                 recordsDeleted = true;
-                System.out.println("✅ Skipped record deletion (partition has no records to delete)");
+                logger.info("✅ Skipped record deletion (partition has no records to delete)");
             }
             
             // Clean up - delete test topic
@@ -1411,7 +1414,7 @@ public class AdvancedKafkaTest {
             assertNotNull(deleteResult, "DeleteTopicsResult should not be null");
             deleteResult.all().get(10, TimeUnit.SECONDS);
             topicDeleted = true;
-            System.out.println("🧹 Test topic cleaned up");
+            logger.info("🧹 Test topic cleaned up");
         }
         
         // Final assertions
@@ -1422,14 +1425,14 @@ public class AdvancedKafkaTest {
         assertTrue(recordsDeleted, "Record deletion should have succeeded");
         assertTrue(topicDeleted, "Topic deletion should have succeeded");
         
-        System.out.println("✅ Admin operations test completed with all assertions passed");
+        logger.info("✅ Admin operations test completed with all assertions passed");
     }
     
     @Test
     @Order(14)
     @DisplayName("Consumer Operations Test")
     public void testConsumerOperations() throws Exception {
-        System.out.println("👥 Testing Advanced Consumer Operations...");
+        logger.info("👥 Testing Advanced Consumer Operations...");
         
         String topicName = "consumer-ops-test-" + System.currentTimeMillis();
         
@@ -1443,7 +1446,7 @@ public class AdvancedKafkaTest {
             NewTopic newTopic = new NewTopic(topicName, 3, (short) 1); // 3 partitions
             CreateTopicsResult createResult = adminClient.createTopics(Collections.singletonList(newTopic));
             createResult.all().get(10, TimeUnit.SECONDS);
-            System.out.println("📝 Created test topic with 3 partitions: " + topicName);
+            logger.info("📝 Created test topic with 3 partitions: " + topicName);
         }
         
         Thread.sleep(2000); // Allow topic to be fully created
@@ -1463,45 +1466,45 @@ public class AdvancedKafkaTest {
                     topicName, partition, "key-" + i, "test-message-" + i);
                 producer.send(record).get();
             }
-            System.out.println("📤 Produced 15 messages across 3 partitions");
+            logger.info("📤 Produced 15 messages across 3 partitions");
         }
         
         Thread.sleep(1000);
         
         // 1. Test Manual Offset Management
-        System.out.println("🔧 Testing manual offset management...");
+        logger.info("🔧 Testing manual offset management...");
         testManualOffsetManagement(topicName);
         
         // 2. Test Auto-commit vs Manual Commit
-        System.out.println("⚡ Testing auto-commit vs manual commit...");
+        logger.info("⚡ Testing auto-commit vs manual commit...");
         testCommitModes(topicName);
         
         // 3. Test Seek Operations
-        System.out.println("🎯 Testing seek operations...");
+        logger.info("🎯 Testing seek operations...");
         testSeekOperations(topicName);
         
         // 4. Test Partition Assignment Strategies
-        System.out.println("📊 Testing partition assignment strategies...");
+        logger.info("📊 Testing partition assignment strategies...");
         testPartitionAssignmentStrategies(topicName);
         
         // 5. Test Pause/Resume Consumption
-        System.out.println("⏸️ Testing pause/resume consumption...");
+        logger.info("⏸️ Testing pause/resume consumption...");
         testPauseResumeConsumption(topicName);
         
         // 6. Test Consumer Lag Monitoring
-        System.out.println("📈 Testing consumer lag monitoring...");
+        logger.info("📈 Testing consumer lag monitoring...");
         testConsumerLagMonitoring(topicName);
         
         // Clean up test topic
         try (AdminClient adminClient = AdminClient.create(adminProps)) {
             DeleteTopicsResult deleteResult = adminClient.deleteTopics(Collections.singletonList(topicName));
             deleteResult.all().get(10, TimeUnit.SECONDS);
-            System.out.println("🧹 Test topic cleaned up");
+            logger.info("🧹 Test topic cleaned up");
         } catch (Exception e) {
-            System.out.println("⚠️ Cleanup failed: " + e.getMessage());
+            logger.info("⚠️ Cleanup failed: " + e.getMessage());
         }
         
-        System.out.println("✅ Consumer operations test completed");
+        logger.info("✅ Consumer operations test completed");
     }
     
     private void testManualOffsetManagement(String topicName) throws Exception {
@@ -1554,9 +1557,9 @@ public class AdvancedKafkaTest {
                            "Committed offset should match for partition " + entry.getKey().partition());
             }
             
-            System.out.println("   ✅ Manual offset commit successful for " + processedCount + " messages");
-            System.out.println("   📍 Committed offsets for " + offsetsToCommit.size() + " partitions");
-            System.out.println("   ✅ Verified committed offsets match expected values");
+            logger.info("   ✅ Manual offset commit successful for " + processedCount + " messages");
+            logger.info("   📍 Committed offsets for " + offsetsToCommit.size() + " partitions");
+            logger.info("   ✅ Verified committed offsets match expected values");
         }
     }
     
@@ -1617,8 +1620,8 @@ public class AdvancedKafkaTest {
             assertTrue(manualCommitSucceeded, "Manual commit should have succeeded when messages were received");
         }
         
-        System.out.println("   ✅ Auto-commit mode: processed " + autoCommitCount + " messages");
-        System.out.println("   ✅ Manual-commit mode: processed " + manualCommitCount + " messages");
+        logger.info("   ✅ Auto-commit mode: processed " + autoCommitCount + " messages");
+        logger.info("   ✅ Manual-commit mode: processed " + manualCommitCount + " messages");
     }
     
     private void testSeekOperations(String topicName) throws Exception {
@@ -1660,31 +1663,31 @@ public class AdvancedKafkaTest {
                 assertTrue(endPosition >= beginningPosition, "End position should be >= beginning position");
                 assertEquals(seekOffset, seekPosition, "Seek position should match target offset");
                 
-                System.out.println("   ✅ Seek to beginning: offset " + beginningPosition);
-                System.out.println("   ✅ Seek to end: offset " + endPosition);
-                System.out.println("   ✅ Seek to specific offset: " + seekPosition);
+                logger.info("   ✅ Seek to beginning: offset " + beginningPosition);
+                logger.info("   ✅ Seek to end: offset " + endPosition);
+                logger.info("   ✅ Seek to specific offset: " + seekPosition);
                 
                 // Poll after seek to verify
                 ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(2000));
-                System.out.println("   📖 Records after seek: " + records.count());
+                logger.info("   📖 Records after seek: " + records.count());
             } else {
-                System.out.println("   ⚠️ No partition assignment for seek test");
+                logger.info("   ⚠️ No partition assignment for seek test");
             }
         }
     }
     
     private void testPartitionAssignmentStrategies(String topicName) throws Exception {
-        System.out.println("   🔄 Testing Range Assignment Strategy...");
+        logger.info("   🔄 Testing Range Assignment Strategy...");
         testAssignmentStrategy(topicName, "range", "org.apache.kafka.clients.consumer.RangeAssignor");
         
-        System.out.println("   🔄 Testing RoundRobin Assignment Strategy...");
+        logger.info("   🔄 Testing RoundRobin Assignment Strategy...");
         testAssignmentStrategy(topicName, "roundrobin", "org.apache.kafka.clients.consumer.RoundRobinAssignor");
         
         try {
-            System.out.println("   🔄 Testing Sticky Assignment Strategy...");
+            logger.info("   🔄 Testing Sticky Assignment Strategy...");
             testAssignmentStrategy(topicName, "sticky", "org.apache.kafka.clients.consumer.StickyAssignor");
         } catch (Exception e) {
-            System.out.println("   ⚠️ Sticky assignment not available in this version: " + e.getMessage());
+            logger.info("   ⚠️ Sticky assignment not available in this version: " + e.getMessage());
         }
     }
     
@@ -1707,10 +1710,10 @@ public class AdvancedKafkaTest {
             Set<TopicPartition> assignment = consumer.assignment();
             assertNotNull(assignment, "Assignment should not be null");
             
-            System.out.println("     ✅ " + strategyName + " strategy assigned " + assignment.size() + " partitions");
+            logger.info("     ✅ " + strategyName + " strategy assigned " + assignment.size() + " partitions");
             
             for (TopicPartition tp : assignment) {
-                System.out.println("     📍 Partition " + tp.partition() + " assigned");
+                logger.info("     📍 Partition " + tp.partition() + " assigned");
             }
         }
     }
@@ -1740,7 +1743,7 @@ public class AdvancedKafkaTest {
                 assertNotNull(pausedPartitions, "Paused partitions should not be null");
                 assertEquals(assignment.size(), pausedPartitions.size(), "All partitions should be paused");
                 
-                System.out.println("   ⏸️ Paused " + pausedPartitions.size() + " partitions");
+                logger.info("   ⏸️ Paused " + pausedPartitions.size() + " partitions");
                 
                 // Poll while paused (should get no records)
                 ConsumerRecords<String, String> pausedRecords = consumer.poll(Duration.ofMillis(2000));
@@ -1752,20 +1755,20 @@ public class AdvancedKafkaTest {
                 
                 assertTrue(resumedPaused.isEmpty(), "No partitions should be paused after resume");
                 
-                System.out.println("   ▶️ Resumed " + assignment.size() + " partitions");
+                logger.info("   ▶️ Resumed " + assignment.size() + " partitions");
                 
                 // Poll after resume
                 ConsumerRecords<String, String> resumedRecords = consumer.poll(Duration.ofMillis(2000));
                 int resumedCount = resumedRecords.count();
                 
-                System.out.println("   📊 Initial poll: " + initialCount + " records");
-                System.out.println("   📊 Paused poll: " + pausedCount + " records");
-                System.out.println("   📊 Resumed poll: " + resumedCount + " records");
+                logger.info("   📊 Initial poll: " + initialCount + " records");
+                logger.info("   📊 Paused poll: " + pausedCount + " records");
+                logger.info("   📊 Resumed poll: " + resumedCount + " records");
                 
                 assertTrue(initialCount >= 0, "Initial count should be non-negative");
                 assertEquals(0, pausedCount, "Paused poll should return 0 records");
             } else {
-                System.out.println("   ⚠️ No partition assignment for pause/resume test");
+                logger.info("   ⚠️ No partition assignment for pause/resume test");
             }
         }
     }
@@ -1809,11 +1812,11 @@ public class AdvancedKafkaTest {
                     assertTrue(endOffset >= currentPosition, "End offset should be >= current position");
                     assertTrue(lag >= 0, "Lag should be non-negative");
                     
-                    System.out.println("   📈 Partition " + tp.partition() + ": position=" + currentPosition + 
+                    logger.info("   📈 Partition " + tp.partition() + ": position=" + currentPosition + 
                                      ", end=" + endOffset + ", lag=" + lag);
                 }
                 
-                System.out.println("   📊 Total consumer lag: " + totalLag + " messages");
+                logger.info("   📊 Total consumer lag: " + totalLag + " messages");
                 
                 // Test lag metrics after consuming some messages
                 if (records.count() > 0) {
@@ -1830,10 +1833,10 @@ public class AdvancedKafkaTest {
                         newTotalLag += lag;
                     }
                     
-                    System.out.println("   📊 Updated total lag: " + newTotalLag + " messages");
+                    logger.info("   📊 Updated total lag: " + newTotalLag + " messages");
                 }
             } else {
-                System.out.println("   ⚠️ No partition assignment for lag monitoring test");
+                logger.info("   ⚠️ No partition assignment for lag monitoring test");
             }
         }
     }
