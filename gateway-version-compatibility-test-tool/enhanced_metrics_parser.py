@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
 Enhanced Kroxylicious Compatibility Test Metrics Parser
-Parses Prometheus metrics to generate compatibility reports with integer API keys
+Parses Prometheus metrics to generate compatibility reports with per-virtual-cluster balance checking
 """
 
-from ast import Nonlocal
 import csv
 import json
 import os
@@ -42,232 +41,181 @@ class EnhancedKroxyliciousMetricsParser:
       print(f"Error reading metrics file {file_path}: {e}")
       return None
 
-  def parse_api_usage(self, metrics_text, client_version, server_version,
-      test_name):
-    """Extract API usage data from metrics with integer API keys"""
+  def parse_api_usage(self, metrics_text, client_version, server_version, test_name):
+    """Extract API usage data from metrics with per-virtual-cluster balance checking"""
     api_data = {}
-
-    # Parse client-to-proxy requests
-    request_pattern = r'kroxylicious_client_to_proxy_request_total\{.*api_key="([^"]*)".*api_version="([^"]*)".*\} ([0-9.]+)'
-    requests_matches = re.findall(request_pattern, metrics_text)
-
-    for api_key_name, api_version, count in requests_matches:
-      # Convert API key to integer
-      api_key_int = get_api_key_int(api_key_name)
-
-      key = f"{api_key_name}_{api_version}"
-      api_data[key] = {
-        'api_key': api_key_name,
-        'api_key_int': api_key_int,
-        'api_version': api_version,
-        'request_count': float(count),
-        'client_version': client_version,
-        'server_version': server_version,
-        'test_name': test_name,
-        'timestamp': datetime.now().isoformat()
-      }
-
-    # Parse error counts - more comprehensive
-    client_error_patterns = [
-      r'kroxylicious_client_to_proxy_errors_total\{.*\} ([0-9.]+)',
-      r'kroxylicious_client_connection_failures_total\{.*\} ([0-9.]+)'
-    ]
-
-    total_client_errors = 0
-    for pattern in client_error_patterns:
-      error_matches = re.findall(pattern, metrics_text)
-      total_client_errors += sum(float(e) for e in error_matches)
-
-    # Parse upstream errors
-    upstream_error_patterns = [
-      r'kroxylicious_upstream_connection_failures_total\{.*\} ([0-9.]+)',
-      r'kroxylicious_proxy_to_upstream_errors_total\{.*\} ([0-9.]+)'
-    ]
-
-    total_upstream_errors = 0
-    for pattern in upstream_error_patterns:
-      error_matches = re.findall(pattern, metrics_text)
-      total_upstream_errors += sum(float(e) for e in error_matches)
-
-    # Add error info to each API
-    for key in api_data:
-      api_data[key]['client_errors'] = total_client_errors
-      api_data[key]['upstream_errors'] = total_upstream_errors
-
-      # Determine status
-      if total_client_errors == 0 and total_upstream_errors == 0 and \
-          api_data[key]['request_count'] > 0:
-        api_data[key]['status'] = 'SUCCESS'
-      elif total_client_errors > 0 or total_upstream_errors > 0:
-        api_data[key]['status'] = 'ERROR'
-      else:
-        api_data[key]['status'] = 'NO_TRAFFIC'
-
+    
+    # Parse all 4 metrics with virtual cluster and node_id information
+    # Using bytes_sum for more accurate balance checking
+    patterns = {
+        'client_to_proxy_request_bytes': r'kroxylicious_client_to_proxy_request_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'proxy_to_server_request_bytes': r'kroxylicious_proxy_to_server_request_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'server_to_proxy_response_bytes': r'kroxylicious_server_to_proxy_response_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)',
+        'proxy_to_client_response_bytes': r'kroxylicious_proxy_to_client_response_size_bytes_sum\{api_key="([^"]*)",api_version="([^"]*)",decoded="[^"]*",node_id="([^"]*)",virtual_cluster="([^"]*)"\} ([0-9.]+)'
+    }
+    
+    # Parse all metrics and aggregate by API+virtual_cluster
+    metrics = {}
+    for metric_type, pattern in patterns.items():
+        matches = re.findall(pattern, metrics_text)
+        for api_key, api_version, node_id, virtual_cluster, count in matches:
+            key = f"{api_key}_{api_version}_{virtual_cluster}"
+            if key not in metrics:
+                metrics[key] = {
+                    'api_key': api_key,
+                    'api_version': api_version,
+                    'virtual_cluster': virtual_cluster,
+                    'client_to_proxy_request_bytes': 0,
+                    'proxy_to_server_request_bytes': 0,
+                    'server_to_proxy_response_bytes': 0,
+                    'proxy_to_client_response_bytes': 0
+                }
+            metrics[key][metric_type] += float(count)
+    
+    # Process each API+virtual_cluster combination
+    for key, data in metrics.items():
+        api_key_int = get_api_key_int(data['api_key'])
+        
+        # Calculate totals using bytes
+        # Balance check: 
+        # 1. client_to_proxy_request_bytes = proxy_to_server_request_bytes (proxy forwards all client requests)
+        # 2. server_to_proxy_response_bytes = proxy_to_client_response_bytes (proxy forwards all server responses)
+        client_to_proxy_bytes = data['client_to_proxy_request_bytes']
+        proxy_to_server_bytes = data['proxy_to_server_request_bytes']
+        server_to_proxy_bytes = data['server_to_proxy_response_bytes']
+        proxy_to_client_bytes = data['proxy_to_client_response_bytes']
+        
+        # Check both balance conditions
+        request_balance = (client_to_proxy_bytes == proxy_to_server_bytes)
+        response_balance = (server_to_proxy_bytes == proxy_to_client_bytes)
+        
+        if request_balance and response_balance and client_to_proxy_bytes > 0:
+            status = 'SUCCESS'
+            client_errors = 0
+            upstream_errors = 0
+        elif client_to_proxy_bytes > 0:
+            status = 'ERROR'  # Imbalanced - proxy didn't forward all bytes correctly
+            # Calculate failed bytes (use the larger imbalance)
+            request_failed = abs(client_to_proxy_bytes - proxy_to_server_bytes)
+            response_failed = abs(server_to_proxy_bytes - proxy_to_client_bytes)
+            client_errors = max(request_failed, response_failed)
+            upstream_errors = 0
+        else:
+            status = 'NO_TRAFFIC'
+            client_errors = 0
+            upstream_errors = 0
+        
+        # Create result record
+        result_key = f"{data['api_key']}_{data['api_version']}_{data['virtual_cluster']}"
+        api_data[result_key] = {
+            'api_key': data['api_key'],
+            'api_key_int': api_key_int,
+            'api_version': data['api_version'],
+            'virtual_cluster': data['virtual_cluster'],
+            'request_bytes': client_to_proxy_bytes,
+            'response_bytes': proxy_to_client_bytes,
+            'client_errors': client_errors,
+            'upstream_errors': upstream_errors,
+            'status': status,
+            'client_version': client_version,
+            'server_version': server_version,
+            'test_name': test_name,
+            'timestamp': datetime.now().isoformat(),
+            # Detailed breakdown for debugging
+            'client_to_proxy_request_bytes': data['client_to_proxy_request_bytes'],
+            'proxy_to_server_request_bytes': data['proxy_to_server_request_bytes'],
+            'server_to_proxy_response_bytes': data['server_to_proxy_response_bytes'],
+            'proxy_to_client_response_bytes': data['proxy_to_client_response_bytes']
+        }
+    
     return api_data
 
-  def parse_status_file(self, file_path, client_version, server_version, test_name):
-    """Parse status file to create entry for failed tests"""
-    try:
-      with open(file_path, 'r') as f:
-        status_content = f.read().strip()
-      
-      # Parse status file content
-      lines = status_content.split('\n')
-      status_info = {}
-      for line in lines:
-        if ':' in line:
-          key, value = line.split(':', 1)
-          status_info[key.strip()] = value.strip()
-      
-      # Determine the failure type and status
-      failure_type = status_info.get('FAILURE_TYPE', 'UNKNOWN')
-      status_message = status_info.get('SETUP_FAILED', status_info.get('SETUP_SUCCESS', 'Unknown status'))
-      
-      # Create a result entry for the failed test
-      result = {
-        'api_key': 'N/A',
-        'api_key_int': None,  # Use None to indicate failed setup
-        'api_version': 'N/A',
-        'request_count': 0,
-        'client_version': client_version,
-        'server_version': server_version,
-        'test_name': test_name,
-        'timestamp': status_info.get('TIMESTAMP', datetime.now().isoformat()),
-        'client_errors': 0,
-        'upstream_errors': 0,
-        'failure_type': failure_type,
-        'status_message': status_message
-      }
-      
-      # Set status based on failure type
-      if failure_type == 'NONE':
-        result['status'] = 'SUCCESS'
-      else:
-        result['status'] = 'SETUP_FAILED'
-      
-      return result
-      
-    except Exception as e:
-      print(f"Error parsing status file {file_path}: {e}")
-      return None
-
   def process_results_directory(self, results_dir):
-    """Process all metrics files and status files in a results directory"""
+    """Process all metrics files in a results directory"""
     print(f"Processing results directory: {results_dir}")
 
-    # Find both metrics and status files
     metrics_files = [f for f in os.listdir(results_dir) if
                      f.endswith('_metrics.txt')]
-    status_files = [f for f in os.listdir(results_dir) if
-                    f.endswith('_status.txt')]
-    
-    print(f"Found {len(metrics_files)} metrics files and {len(status_files)} status files")
+    print(f"Found {len(metrics_files)} metrics files")
 
-    # Process metrics files (successful tests)
     for metrics_file in sorted(metrics_files):
       file_path = os.path.join(results_dir, metrics_file)
+      print(f"Processing: {metrics_file}")
 
-      # Extract test info from filename
-      # Expected format: java3.6_server3.8_metrics.txt
-      base_name = metrics_file.replace('_metrics.txt', '')
-      if 'java' in base_name and 'server' in base_name:
-        parts = base_name.split('_')
-        client_part = [p for p in parts if p.startswith('java')]
-        server_part = [p for p in parts if p.startswith('server')]
+      # Extract version info from filename
+      # Format: java7.4.0_server7.4.0_metrics.txt
+      match = re.match(r'java([^_]+)_server([^_]+)_metrics\.txt',
+                       metrics_file)
+      if not match:
+        print(f"Warning: Could not parse version info from {metrics_file}")
+        continue
 
-        if client_part and server_part:
-          client_version = client_part[0].replace('java', '')
-          server_version = server_part[0].replace('server', '')
+      client_version = match.group(1)
+      server_version = match.group(2)
 
-          print(
-            f"Processing: {metrics_file} -> Client: {client_version}, Server: {server_version}")
+      # Parse metrics
+      metrics_text = self.parse_metrics_file(file_path)
+      if not metrics_text:
+        continue
 
-          # Parse metrics file
-          metrics_text = self.parse_metrics_file(file_path)
-          if metrics_text:
-            api_data = self.parse_api_usage(metrics_text, client_version,
-                                            server_version, base_name)
-            self.results.extend(api_data.values())
-            print(f"  Found {len(api_data)} API calls")
-          else:
-            print(f"  Failed to parse {metrics_file}")
-        else:
-          print(
-            f"  Skipping {metrics_file} - couldn't parse client/server versions")
-      else:
-        print(f"  Skipping {metrics_file} - not a test metrics file")
+      api_data = self.parse_api_usage(metrics_text, client_version,
+                                      server_version, metrics_file)
 
-    # Process status files (including failed tests)
-    for status_file in sorted(status_files):
-      file_path = os.path.join(results_dir, status_file)
-      
-      # Extract test info from filename  
-      # Expected format: java3.6_server3.8_status.txt
-      base_name = status_file.replace('_status.txt', '')
-      if 'java' in base_name and 'server' in base_name:
-        parts = base_name.split('_')
-        client_part = [p for p in parts if p.startswith('java')]
-        server_part = [p for p in parts if p.startswith('server')]
+      # Add to results
+      for data in api_data.values():
+        self.results.append(data)
 
-        if client_part and server_part:
-          client_version = client_part[0].replace('java', '')
-          server_version = server_part[0].replace('server', '')
+    print(f"Processed {len(self.results)} API usage records")
 
-          # Check if we already processed metrics for this combination
-          existing_result = any(r['client_version'] == client_version and 
-                              r['server_version'] == server_version 
-                              for r in self.results)
-          
-          if not existing_result:
-            # Process failed test status
-            print(f"Processing failed test: {status_file} -> Client: {client_version}, Server: {server_version}")
-            status_data = self.parse_status_file(file_path, client_version, server_version, base_name)
-            if status_data:
-              self.results.append(status_data)
-              print(f"  Added failed test entry")
-          else:
-            print(f"  Skipping {status_file} - already have metrics data for this combination")
-
-  def _build_matrix_data(self):
-    """Build matrix data structure from results"""
+  def generate_compatibility_matrix(self):
+    """Generate compatibility matrix from results with virtual cluster breakdown"""
     matrix = defaultdict(lambda: {
       'apis': set(),
       'api_ints': set(),
       'api_versions': set(),
-      'total_requests': 0,
+      'virtual_clusters': set(),
+      'total_request_bytes': 0,
+      'total_response_bytes': 0,
       'total_client_errors': 0,
       'total_upstream_errors': 0,
       'successful_apis': set(),
       'failed_apis': set(),
-      'setup_status': 'UNKNOWN',
-      'failure_type': None,
-      'status_message': None
+      'virtual_cluster_breakdown': defaultdict(lambda: {
+        'total_request_bytes': 0,
+        'total_response_bytes': 0,
+        'total_errors': 0,
+        'successful_apis': set(),
+        'failed_apis': set()
+      })
     })
 
     for result in self.results:
       key = f"{result['client_version']}-{result['server_version']}"
-      
-      # Handle setup failed results differently
-      if result['status'] == 'SETUP_FAILED':
-        matrix[key]['setup_status'] = 'SETUP_FAILED'
-        matrix[key]['failure_type'] = result.get('failure_type', 'UNKNOWN')
-        matrix[key]['status_message'] = result.get('status_message', 'Setup failed')
-        # Don't add API data for failed setups
-        continue
+      vc_key = result['virtual_cluster']
       
       matrix[key]['apis'].add(result['api_key'])
       matrix[key]['api_ints'].add(str(result['api_key_int']))
       matrix[key]['api_versions'].add(result['api_version'])
-      matrix[key]['total_requests'] += result['request_count']
-      matrix[key]['total_client_errors'] = result['client_errors']
-      matrix[key]['total_upstream_errors'] = result['upstream_errors']
-      matrix[key]['setup_status'] = 'SUCCESS'
+      matrix[key]['virtual_clusters'].add(vc_key)
+      matrix[key]['total_request_bytes'] += result['request_bytes']
+      matrix[key]['total_response_bytes'] += result['response_bytes']
+      matrix[key]['total_client_errors'] += result['client_errors']
+      matrix[key]['total_upstream_errors'] += result['upstream_errors']
+
+      # Update virtual cluster breakdown
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_request_bytes'] += result['request_bytes']
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_response_bytes'] += result['response_bytes']
+      matrix[key]['virtual_cluster_breakdown'][vc_key]['total_errors'] += result['client_errors']
 
       if result['status'] == 'SUCCESS':
         matrix[key]['successful_apis'].add(
           f"{result['api_key']}({result['api_key_int']})")
+        matrix[key]['virtual_cluster_breakdown'][vc_key]['successful_apis'].add(
+          f"{result['api_key']}({result['api_key_int']})")
       elif result['status'] == 'ERROR':
         matrix[key]['failed_apis'].add(
+          f"{result['api_key']}({result['api_key_int']})")
+        matrix[key]['virtual_cluster_breakdown'][vc_key]['failed_apis'].add(
           f"{result['api_key']}({result['api_key_int']})")
 
     return matrix
@@ -276,67 +224,97 @@ class EnhancedKroxyliciousMetricsParser:
     """Generate detailed CSV report"""
     csv_file = os.path.join(output_dir, "detailed_api_usage.csv")
     with open(csv_file, 'w', newline='') as f:
-      fieldnames = ['api_key', 'api_key_int', 'api_version', 'client_version',
-                    'server_version',
-                    'request_count', 'client_errors', 'upstream_errors',
-                    'status', 'test_name', 'timestamp', 'failure_type', 'status_message']
+      fieldnames = ['api_key', 'api_key_int', 'api_version', 'virtual_cluster', 
+                    'client_version', 'server_version', 'request_bytes', 'response_bytes',
+                    'client_errors', 'upstream_errors', 'status', 'test_name', 'timestamp',
+                    'client_to_proxy_request_bytes', 'proxy_to_server_request_bytes',
+                    'server_to_proxy_response_bytes', 'proxy_to_client_response_bytes']
       writer = csv.DictWriter(f, fieldnames=fieldnames)
       writer.writeheader()
-      
-      # Add failure_type and status_message fields to results that don't have them
-      for result in self.results:
-        if 'failure_type' not in result:
-          result['failure_type'] = None
-        if 'status_message' not in result:
-          result['status_message'] = None
-      
       writer.writerows(self.results)
     return csv_file
 
-  def _generate_summary_table(self, output_dir, matrix):
-    """Generate summary table report"""
+  def _generate_summary_report(self, output_dir, matrix):
+    """Generate summary report"""
     summary_file = os.path.join(output_dir, "compatibility_summary.txt")
     with open(summary_file, 'w') as f:
-      f.write("KAFKA CLIENT COMPATIBILITY TEST RESULTS\n")
-      f.write("=" * 120 + "\n\n")
-      f.write(
-        f"{'CLIENT':<8} | {'SERVER':<8} | {'SUCCESSFUL_APIS':<25} | {'FAILED_APIS':<15} | {'REQUESTS':<8} | {'ERRORS':<8} | {'STATUS':<15} | FAILURE_REASON\n")
-      f.write("-" * 120 + "\n")
-
+      f.write("KAFKA CLIENT-SERVER COMPATIBILITY MATRIX\n")
+      f.write("=" * 60 + "\n\n")
+      
       for key, data in sorted(matrix.items()):
         client_ver, server_ver = key.split('-')
+        f.write(f"CLIENT: {client_ver} | SERVER: {server_ver}\n")
+        f.write("-" * 40 + "\n")
         
-        # Check if this was a setup failure
-        if data['setup_status'] == 'SETUP_FAILED':
-          status = "🚫 SETUP_FAILED"
-          failure_reason = data.get('failure_type', 'UNKNOWN')
-          successful_apis = "N/A"
-          failed_apis = "N/A"
-          requests = 0
-          total_errors = 0
+        # Overall summary
+        total_errors = data['total_client_errors'] + data['total_upstream_errors']
+        
+        # Check if only acceptable APIs are failing
+        acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+        failed_apis = {api.split('(')[0] for api in data['failed_apis']}  # Extract API name without version
+        unacceptable_failures = failed_apis - acceptable_failures
+        
+        if data['total_request_bytes'] > 0 and total_errors == 0:
+          overall_status = "✅ PASS"
+        elif data['total_request_bytes'] > 0 and len(unacceptable_failures) == 0:
+          overall_status = "✅ PASS (with acceptable api failures)"
+        elif data['total_request_bytes'] > 0 and total_errors > 0:
+          overall_status = "❌ FAIL"
         else:
-          successful_apis = ','.join(sorted(data['successful_apis']))[
-                            :20] + "..." if len(
-            ','.join(data['successful_apis'])) > 20 else ','.join(
-            sorted(data['successful_apis']))
-          failed_apis = ','.join(sorted(data['failed_apis']))[:10] + "..." if len(
-            ','.join(data['failed_apis'])) > 10 else ','.join(
-            sorted(data['failed_apis']))
-
-          total_errors = data['total_client_errors'] + data[
-            'total_upstream_errors']
-          requests = int(data['total_requests'])
-          failure_reason = ""
-
-          if total_errors == 0 and requests > 0:
-            status = "✅ PASS"
-          elif total_errors > 0:
-            status = "❌ FAIL"
+          overall_status = "⚠️ NO_DATA"
+        
+        f.write(f"OVERALL STATUS: {overall_status}\n")
+        f.write(f"Total Request Bytes: {int(data['total_request_bytes'])} | Total Response Bytes: {int(data['total_response_bytes'])} | Error Bytes: {int(total_errors)}\n")
+        f.write(f"Successful APIs: {len(data['successful_apis'])} | Failed APIs: {len(data['failed_apis'])}\n\n")
+        
+        # Virtual cluster breakdown
+        f.write("CLIENT AUTHENTICATION MODES:\n")
+        f.write("-" * 30 + "\n")
+        
+        for vc_name, vc_data in data['virtual_cluster_breakdown'].items():
+          # Determine virtual cluster type
+          if 'sasl' in vc_name:
+            vc_type = "SASL"
+          elif 'ssl' in vc_name:
+            vc_type = "SSL"
           else:
-            status = "⚠️ NO_DATA"
-
-        f.write(
-          f"{client_ver:<8} | {server_ver:<8} | {successful_apis:<25} | {failed_apis:<15} | {requests:<8} | {int(total_errors):<8} | {status:<15} | {failure_reason}\n")
+            vc_type = "PLAINTEXT"
+          
+          vc_errors = vc_data['total_errors']
+          
+          # Check if only acceptable APIs are failing for this virtual cluster
+          acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+          vc_failed_apis = {api.split('(')[0] for api in vc_data['failed_apis']}  # Extract API name without version
+          vc_unacceptable_failures = vc_failed_apis - acceptable_failures
+          
+          if vc_data['total_request_bytes'] > 0 and vc_errors == 0:
+            vc_status = "✅ PASS"
+          elif vc_data['total_request_bytes'] > 0 and len(vc_unacceptable_failures) == 0:
+            vc_status = "✅ PASS (with acceptable api failures)"
+          elif vc_data['total_request_bytes'] > 0 and vc_errors > 0:
+            vc_status = "❌ FAIL"
+          else:
+            vc_status = "⚠️ NO_DATA"
+          
+          f.write(f"  {vc_type:<12} | {vc_status} | Request Bytes: {int(vc_data['total_request_bytes']):<8} | Response Bytes: {int(vc_data['total_response_bytes']):<8} | Error Bytes: {int(vc_errors):<6} | Success: {len(vc_data['successful_apis']):<3} | Failed: {len(vc_data['failed_apis'])}\n")
+        
+        f.write("\n")
+        
+        # Detailed API breakdown
+        if data['failed_apis']:
+          f.write("FAILED APIs:\n")
+          for api in sorted(data['failed_apis']):
+            f.write(f"  ❌ {api}\n")
+          f.write("\n")
+        
+        if data['successful_apis']:
+          f.write("SUCCESSFUL APIs:\n")
+          for api in sorted(data['successful_apis']):
+            f.write(f"  ✅ {api}\n")
+          f.write("\n")
+        
+        f.write("=" * 60 + "\n\n")
+    
     return summary_file
 
   def _generate_api_reference(self, output_dir):
@@ -344,85 +322,181 @@ class EnhancedKroxyliciousMetricsParser:
     api_ref_file = os.path.join(output_dir, "api_key_reference.txt")
     with open(api_ref_file, 'w') as f:
       f.write("KAFKA API KEY REFERENCE\n")
-      f.write("=" * 50 + "\n")
-      f.write(f"{'API_NAME':<30} | {'API_INT':<8}\n")
-      f.write("-" * 50 + "\n")
-
-      # Show only APIs that were actually used
-      used_apis = set()
-      for result in self.results:
-        used_apis.add((result['api_key'], result['api_key_int']))
-
-      for api_name, api_int in sorted(used_apis,
-                                      key=lambda x: x[1] if isinstance(x[1],
-                                                                       int) else 999):
-        f.write(f"{api_name:<30} | {api_int:<8}\n")
+      f.write("=" * 30 + "\n\n")
+      for api_name, api_int in sorted(KAFKA_API_KEYS.items()):
+        f.write(f"{api_name:<30} -> {api_int}\n")
     return api_ref_file
 
-  def _generate_json_report(self, output_dir, matrix):
-    """Generate JSON report"""
+  def generate_reports(self, output_dir):
+    """Generate all reports"""
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Generate compatibility matrix
+    matrix = self.generate_compatibility_matrix()
+
+    # Generate detailed CSV
+    csv_file = self._generate_detailed_csv(output_dir)
+    print(f"Generated detailed CSV: {csv_file}")
+
+    # Generate summary report
+    summary_file = self._generate_summary_report(output_dir, matrix)
+    print(f"Generated summary report: {summary_file}")
+
+    # Generate API reference
+    api_ref_file = self._generate_api_reference(output_dir)
+    print(f"Generated API reference: {api_ref_file}")
+
+    # Generate enhanced JSON report
+    json_file = self._generate_enhanced_json_report(output_dir, matrix)
+    print(f"Generated enhanced JSON report: {json_file}")
+
+    return {
+      'csv_file': csv_file,
+      'summary_file': summary_file,
+      'api_ref_file': api_ref_file,
+      'json_file': json_file
+    }
+
+  def _generate_enhanced_json_report(self, output_dir, matrix):
+    """Generate enhanced JSON report with test matrix info and virtual cluster breakdown"""
     json_file = os.path.join(output_dir, "compatibility_report.json")
     
-    # Count setup failures and successes
-    setup_failures = sum(1 for v in matrix.values() if v['setup_status'] == 'SETUP_FAILED')
-    setup_successes = sum(1 for v in matrix.values() if v['setup_status'] == 'SUCCESS')
+    # Calculate test matrix info
+    client_versions = set()
+    server_versions = set()
+    for result in self.results:
+      client_versions.add(result['client_version'])
+      server_versions.add(result['server_version'])
+    
+    total_expected_combinations = len(client_versions) * len(server_versions)
+    tested_combinations = len(matrix)
+    missing_combinations = total_expected_combinations - tested_combinations
+    
+    # Calculate overall compatibility percentage (including acceptable failures)
+    def is_test_passing(data):
+      if data['total_request_bytes'] == 0:
+        return False
+      if (data['total_client_errors'] + data['total_upstream_errors']) == 0:
+        return True
+      # Check if only acceptable APIs are failing
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      failed_apis = {api.split('(')[0] for api in data['failed_apis']}
+      unacceptable_failures = failed_apis - acceptable_failures
+      return len(unacceptable_failures) == 0
+    
+    passed_tests = sum(1 for data in matrix.values() if is_test_passing(data))
+    total_tests = len([data for data in matrix.values() if data['total_request_bytes'] > 0])
+    compatibility_percentage = (passed_tests / total_tests * 100) if total_tests > 0 else 0
+    
+    # Calculate test summary (including acceptable failures)
+    passed_tests_count = sum(1 for data in matrix.values() if is_test_passing(data))
+    failed_tests_count = sum(1 for data in matrix.values() 
+                           if data['total_request_bytes'] > 0 and not is_test_passing(data))
+    no_data_tests = sum(1 for data in matrix.values() if data['total_request_bytes'] == 0)
+    total_api_bytes = sum(data['total_request_bytes'] for data in matrix.values())
+    
+    # Convert matrix data for JSON serialization
+    enhanced_matrix = {}
+    for k, v in matrix.items():
+      client_ver, server_ver = k.split('-')
+      
+      # Determine status (including acceptable failures)
+      total_errors = v['total_client_errors'] + v['total_upstream_errors']
+      acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR'}
+      failed_apis = {api.split('(')[0] for api in v['failed_apis']}
+      unacceptable_failures = failed_apis - acceptable_failures
+      
+      if v['total_request_bytes'] > 0 and total_errors == 0:
+        status = "PASS"
+        status_emoji = "✅"
+      elif v['total_request_bytes'] > 0 and len(unacceptable_failures) == 0:
+        status = "PASS_ACCEPTABLE"
+        status_emoji = "✅"
+      elif v['total_request_bytes'] > 0 and total_errors > 0:
+        status = "FAIL"
+        status_emoji = "❌"
+      else:
+        status = "NO_DATA"
+        status_emoji = "⚠️"
+      
+      # Convert virtual cluster breakdown to serializable format
+      vc_breakdown = {}
+      for vc_name, vc_data in v['virtual_cluster_breakdown'].items():
+        vc_breakdown[vc_name] = {
+          'total_request_bytes': vc_data['total_request_bytes'],
+          'total_response_bytes': vc_data['total_response_bytes'],
+          'successful_apis': list(vc_data['successful_apis']),
+          'failed_apis': list(vc_data['failed_apis'])
+        }
+      
+      enhanced_matrix[k] = {
+        **v, 
+        'apis': list(v['apis']), 
+        'api_ints': list(v['api_ints']),
+        'api_versions': list(v['api_versions']),
+        'virtual_clusters': list(v['virtual_clusters']),
+        'successful_apis': list(v['successful_apis']),
+        'failed_apis': list(v['failed_apis']),
+        'virtual_cluster_breakdown': vc_breakdown,
+        'client_version': client_ver,
+        'server_version': server_ver,
+        'status': status,
+        'status_emoji': status_emoji,
+        'compatibility_score': 100 if status in ["PASS", "PASS_ACCEPTABLE"] else (50 if status == "NO_DATA" else 0)
+      }
+    
+    report_data = {
+      'test_timestamp': datetime.now().isoformat(),
+      'test_matrix_info': {
+        'total_expected_combinations': total_expected_combinations,
+        'tested_combinations': tested_combinations,
+        'missing_combinations': missing_combinations,
+        'client_versions': sorted(list(client_versions)),
+        'server_versions': sorted(list(server_versions)),
+        'compatibility_percentage': round(compatibility_percentage, 1)
+      },
+      'test_summary': {
+        'passed_tests': passed_tests_count,
+        'failed_tests': failed_tests_count,
+        'no_data_tests': no_data_tests,
+        'missing_tests': missing_combinations,
+        'total_api_bytes': int(total_api_bytes)
+      },
+      'matrix_results': enhanced_matrix,
+      'api_key_mapping': KAFKA_API_KEYS
+    }
     
     with open(json_file, 'w') as f:
-      json.dump({
-        'test_timestamp': datetime.now().isoformat(),
-        'total_combinations': len(matrix),
-        'setup_successes': setup_successes,
-        'setup_failures': setup_failures,
-        'total_api_calls': len([r for r in self.results if r['status'] != 'SETUP_FAILED']),
-        'matrix_results': {
-          k: {**v, 'apis': list(v['apis']), 'api_ints': list(v['api_ints']),
-              'api_versions': list(v['api_versions']),
-              'successful_apis': list(v['successful_apis']),
-              'failed_apis': list(v['failed_apis'])} for k, v in
-          matrix.items()},
-        'api_key_mapping': KAFKA_API_KEYS,
-        'setup_failed_combinations': [k for k, v in matrix.items() if v['setup_status'] == 'SETUP_FAILED']
-      }, f, indent=2, default=str)
+      json.dump(report_data, f, indent=2)
+    
     return json_file
 
-  def generate_report(self, output_dir):
-    """Generate comprehensive compatibility report"""
-    print(f"\nGenerating reports in: {output_dir}")
 
-    if not self.results:
-      print("No results to process!")
-      return
-
-    # Build matrix data from results
-    matrix = self._build_matrix_data()
-
-    # Generate all report files
-    csv_file = self._generate_detailed_csv(output_dir)
-    summary_file = self._generate_summary_table(output_dir, matrix)
-    api_ref_file = self._generate_api_reference(output_dir)
-    json_file = self._generate_json_report(output_dir, matrix)
-
-    print(f"\nReports generated:")
-    print(f"  📊 Summary: {summary_file}")
-    print(f"  📋 Detailed CSV: {csv_file}")
-    print(f"  📖 API Reference: {api_ref_file}")
-    print(f"  🗃️  JSON Report: {json_file}")
-
-
-if __name__ == "__main__":
-  if len(sys.argv) < 2:
-    print("Usage:")
-    print("  python3 enhanced_metrics_parser.py <results_directory>")
-    print(
-      "  python3 enhanced_metrics_parser.py /path/to/compatibility-results/20231103_140230")
+def main():
+  if len(sys.argv) != 2:
+    print("Usage: python3 enhanced_metrics_parser.py <results_directory>")
     sys.exit(1)
 
   results_dir = sys.argv[1]
-
   if not os.path.exists(results_dir):
-    print(f"Error: Directory {results_dir} does not exist")
+    print(f"Error: Results directory {results_dir} does not exist")
     sys.exit(1)
 
   parser = EnhancedKroxyliciousMetricsParser()
   parser.process_results_directory(results_dir)
-  parser.generate_report(results_dir)
+
+  if not parser.results:
+    print("No results found to process")
+    sys.exit(1)
+
+  # Generate reports
+  output_dir = os.path.join(results_dir, "reports")
+  reports = parser.generate_reports(output_dir)
+
+  print(f"\nReports generated in: {output_dir}")
+  for report_type, report_path in reports.items():
+    print(f"  {report_type}: {report_path}")
+
+
+if __name__ == "__main__":
+  main()
