@@ -2,16 +2,38 @@ services:
   kafka-server:
     image: confluentinc/cp-server:${KAFKA_SERVER_VERSION}
     depends_on: []
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+      - "9095:9095"
+    volumes:
+      - ./ssl:/etc/kafka/secrets
+      - ./configs:/etc/kafka/configs
     environment:
       KAFKA_BROKER_ID: 1
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://kafka-server:9093,SASL_PLAINTEXT://0.0.0.0:9094,SSL://0.0.0.0:9095
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:9092,SASL_PLAINTEXT://kafka-server:9094,SSL://kafka-server:9095
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,SSL:SSL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: truststore_creds
+      KAFKA_SSL_KEY_CREDENTIALS: key_creds
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: truststore_creds
+      KAFKA_SSL_CLIENT_AUTH: none
+
+      KAFKA_LISTENER_NAME_SASL_PLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret" user_admin="admin-secret" user_alice="alice-secret";'
+
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/configs/kafka_server_jaas.conf"
+      
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
 
       # KRaft mode configuration
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_NODE_ID: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-server:9093'
-      KAFKA_LISTENERS: PLAINTEXT://kafka-server:9092,CONTROLLER://kafka-server:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
@@ -25,13 +47,27 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
+
+      KAFKA_SUPER_USERS: User:ANONYMOUS
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   gateway:
     image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
-    depends_on: [kafka-server]
+    depends_on:
+      kafka-server:
+        condition: service_healthy
     ports:
       - "19092:19092"
       - "19093:19093"
+      - "19094:19094"
       - "9190:9190"
+    volumes:
+      - ./ssl:/etc/gateway/secrets
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka-server:9092
       GATEWAY_CONFIG: |
@@ -48,6 +84,33 @@ services:
                   - name: "default"
                     start: 0
                     end: 1
+        
+            - name: "vct-domain-sasl"
+              kafkaCluster:
+                name: "vct-cluster"
+                bootstrapServers:
+                  - endpoint: "kafka-server:9094"
+                    id: sasl
+                nodeIdRanges:
+                  - name: "default"
+                    start: 0
+                    end: 1
+        
+            - name: "vct-domain-ssl"
+              kafkaCluster:
+                name: "vct-cluster"
+                bootstrapServers:
+                  - endpoint: "kafka-server:9095"
+                    id: ssl
+                    ssl:
+                      truststore:
+                        location: /etc/gateway/secrets/kafka.truststore.jks
+                        password:
+                          file: /etc/gateway/secrets/truststore_creds
+                nodeIdRanges:
+                  - name: "default"
+                    start: 0
+                    end: 1
           routes:
             - name: "vct-route"
               endpoint: "gateway:19092"
@@ -58,13 +121,60 @@ services:
                 bootstrapServerId: "plaintext"
               security:
                 auth: "passthrough"
+        
+            - name: "vct-route-sasl"
+              endpoint: "gateway:19095"
+              brokerIdentificationStrategy:
+                type: port
+              streamingDomain:
+                name: "vct-domain-sasl"
+                bootstrapServerId: "sasl"
+              security:
+                auth: "passthrough"
+        
+            - name: "vct-route-ssl"
+              endpoint: "gateway:19098"
+              brokerIdentificationStrategy:
+                type: port
+              streamingDomain:
+                name: "vct-domain-ssl"
+                bootstrapServerId: "ssl"
+              security:
+                auth: "passthrough"
+                ssl:
+                  truststore:
+                    location: /etc/gateway/secrets/kafka.truststore.jks
+                    password:
+                      file: /etc/gateway/secrets/truststore_creds
+                  keystore:
+                    location: /etc/gateway/secrets/kafka.keystore.jks
+                    password:
+                      file: /etc/gateway/secrets/truststore_creds
+                  clientAuth: none
           admin:
             endpoints:
               metrics: true
           advanced:
             useIoUring: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9190/metrics || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
   kafka-client-test:
-    image: confluentinc/cp-server:${KAFKA_CLIENT_VERSION}
-    depends_on: [gateway]
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka-maven
+      args:
+        KAFKA_VERSION: ${KAFKA_CLIENT_VERSION}
+    depends_on:
+      gateway:
+        condition: service_healthy
     container_name: kafka-client-test
+    volumes:
+      - ./ssl:/etc/kafka/secrets
+      - ${JUNIT_RESULTS_DIR:-./test-results/junit}:/junit-results
+      - ${HTML_RESULTS_DIR:-./test-results/html}:/html-results
+      - ${MAVEN_REPO_DIR:-./test-results/.m2}:/root/.m2
     command: sleep infinity
