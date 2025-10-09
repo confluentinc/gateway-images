@@ -241,6 +241,59 @@ class EnhancedKroxyliciousMetricsParser:
       f.write("KAFKA CLIENT-SERVER COMPATIBILITY MATRIX\n")
       f.write("=" * 60 + "\n\n")
       
+      # Generate summary matrix at the top
+      f.write("SUMMARY MATRIX - ALL TESTED COMBINATIONS\n")
+      f.write("-" * 80 + "\n")
+      
+      # Create table header
+      f.write(f"{'Client':<10} {'Server':<10} {'Auth_Mode':<12} {'Status':<8} {'Tests_Run':<10} {'Tests_Passed':<12} {'Tests_Failed':<12}\n")
+      f.write("-" * 88 + "\n")
+      
+      # Process each combination and create rows for each authentication mode
+      for key, data in sorted(matrix.items()):
+        client_ver, server_ver = key.split('-')
+        
+        # Get JUnit results for this combination
+        if junit_results and key in junit_results:
+          vc_results = junit_results[key]
+          
+          # Create a row for each virtual cluster (authentication mode)
+          for vc_name, vc_data in data['virtual_cluster_breakdown'].items():
+            # Determine virtual cluster type
+            if 'sasl' in vc_name:
+              auth_mode = "SASL"
+            elif 'ssl' in vc_name:
+              auth_mode = "SSL"
+            else:
+              auth_mode = "PLAINTEXT"
+            
+            # Get JUnit test results for this virtual cluster
+            if auth_mode in vc_results:
+              junit_data = vc_results[auth_mode]
+              tests_run = junit_data['tests_run']
+              tests_failed = junit_data['failures'] + junit_data['errors']
+              tests_passed = tests_run - tests_failed
+              
+              # Determine status based on test results
+              if tests_failed == 0:
+                status = "✅"
+              else:
+                status = "❌"
+            else:
+              tests_run = 0
+              tests_passed = 0
+              tests_failed = 0
+              status = "❓"
+            
+            f.write(f"{client_ver:<10} {server_ver:<10} {auth_mode:<12} {status:<8} {tests_run:<10} {tests_passed:<12} {tests_failed:<12}\n")
+        else:
+          # No JUnit results available, show N/A
+          f.write(f"{client_ver:<10} {server_ver:<10} {'N/A':<12} {'❓':<8} {'N/A':<10} {'N/A':<12} {'N/A':<12}\n")
+      
+      f.write("\n")
+      f.write("DETAILED BREAKDOWN BY COMBINATION\n")
+      f.write("=" * 50 + "\n\n")
+      
       for key, data in sorted(matrix.items()):
         client_ver, server_ver = key.split('-')
         f.write(f"CLIENT: {client_ver} | SERVER: {server_ver}\n")
@@ -308,10 +361,31 @@ class EnhancedKroxyliciousMetricsParser:
         
         # Detailed API breakdown
         if data['failed_apis']:
-          f.write("FAILED APIs:\n")
-          for api in sorted(data['failed_apis']):
-            f.write(f"  ❌ {api}\n")
-          f.write("\n")
+          # Separate acceptable and unacceptable failed APIs
+          acceptable_failures = {'METADATA', 'DESCRIBE_CLUSTER', 'FIND_COORDINATOR', 'API_VERSIONS'}
+          acceptable_failed_apis = []
+          unacceptable_failed_apis = []
+          
+          for api in data['failed_apis']:
+            api_name = api.split('(')[0]  # Extract API name without version
+            if api_name in acceptable_failures:
+              acceptable_failed_apis.append(api)
+            else:
+              unacceptable_failed_apis.append(api)
+          
+          # Show acceptable failed APIs with warning symbol
+          if acceptable_failed_apis:
+            f.write("ACCEPTABLE FAILED APIs:\n")
+            for api in sorted(acceptable_failed_apis):
+              f.write(f"  ⚠️ {api}\n")
+            f.write("\n")
+          
+          # Show unacceptable failed APIs with error symbol
+          if unacceptable_failed_apis:
+            f.write("FAILED APIs:\n")
+            for api in sorted(unacceptable_failed_apis):
+              f.write(f"  ❌ {api}\n")
+            f.write("\n")
         
         if data['successful_apis']:
           f.write("SUCCESSFUL APIs:\n")
