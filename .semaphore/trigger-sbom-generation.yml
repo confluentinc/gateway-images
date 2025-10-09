@@ -1,0 +1,17 @@
+version: v1.0
+name: trigger-sbom-generation
+agent:
+  machine:
+    type: s1-prod-ubuntu24-04-arm64-1
+execution_time_limit:
+  minutes: 60
+blocks:
+  - name: Trigger APPSEC SBOM Generation Task
+    dependencies: []
+    task:
+      jobs:
+        - name: Trigger APPSEC SBOM Generation Task
+          commands:
+            - |
+              sem-trigger -p appsec-semaphore-workflows -b master -t gateway-release-time-sbom-generation \
+              -i "VERSION:${SEMAPHORE_GIT_BRANCH}" -i "DT_UPLOAD:True"
