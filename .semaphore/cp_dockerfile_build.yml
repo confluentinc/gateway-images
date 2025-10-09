@@ -270,6 +270,12 @@ blocks:
               done
             - echo "Tags summary saved to docker-tags-summary.txt"
             - artifact push workflow docker-tags-summary.txt
+promotions:
+  - name: 'Trigger APPSEC SBOM Generation Task'
+    pipeline_file: trigger-sbom-generation.yml
+    auto_promote:
+      # Run this promotion for RC branches
+      when: "result = 'passed' and branch =~ '^\\d+\\.\\d+\\.\\d+-rc\\d+$'"
 after_pipeline:
   task:
     agent:
