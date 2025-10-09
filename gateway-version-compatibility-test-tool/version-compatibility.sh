@@ -142,9 +142,9 @@ run_compatibility_test() {
     mkdir -p "$RESULTS_DIR/${test_id}_html" 
     mkdir -p "$RESULTS_DIR/${test_id}_m2"
     
-    export JUNIT_RESULTS_DIR="$PWD/$RESULTS_DIR/${test_id}_junit"
-    export HTML_RESULTS_DIR="$PWD/$RESULTS_DIR/${test_id}_html"
-    export MAVEN_REPO_DIR="$PWD/$RESULTS_DIR/${test_id}_m2"
+    export JUNIT_RESULTS_DIR="$RESULTS_DIR/${test_id}_junit"
+    export HTML_RESULTS_DIR="$RESULTS_DIR/${test_id}_html"
+    export MAVEN_REPO_DIR="$RESULTS_DIR/${test_id}_m2"
     
     echo "JUnit results will be saved to: $JUNIT_RESULTS_DIR"
     echo "HTML reports will be saved to: $HTML_RESULTS_DIR"
@@ -337,6 +337,16 @@ run_compatibility_test() {
         echo "   Check JUnit XML reports at: $JUNIT_RESULTS_DIR"
         return 1
     fi
+    
+    # Copy JUnit results from container to host
+    echo "📋 Copying JUnit test results from container..."
+    docker cp kafka-client-test:/junit-results/plaintext/ "$JUNIT_RESULTS_DIR/" 2>/dev/null || echo "⚠️ Could not copy PLAINTEXT JUnit results"
+    docker cp kafka-client-test:/junit-results/sasl-admin/ "$JUNIT_RESULTS_DIR/" 2>/dev/null || echo "⚠️ Could not copy SASL JUnit results"
+    docker cp kafka-client-test:/junit-results/ssl/ "$JUNIT_RESULTS_DIR/" 2>/dev/null || echo "⚠️ Could not copy SSL JUnit results"
+    
+    # Copy HTML results from container to host
+    echo "📊 Copying HTML test results from container..."
+    docker cp kafka-client-test:/html-results/ "$HTML_RESULTS_DIR/" 2>/dev/null || echo "⚠️ Could not copy HTML results"
     
     # Scrape metrics
     sleep 5
