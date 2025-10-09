@@ -174,7 +174,4 @@ services:
     container_name: kafka-client-test
     volumes:
       - ./ssl:/etc/kafka/secrets
-      - ${JUNIT_RESULTS_DIR:-./test-results/junit}:/junit-results
-      - ${HTML_RESULTS_DIR:-./test-results/html}:/html-results
-      - ${MAVEN_REPO_DIR:-./test-results/.m2}:/root/.m2
     command: sleep infinity

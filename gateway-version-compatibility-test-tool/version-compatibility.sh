@@ -137,14 +137,14 @@ run_compatibility_test() {
     echo "Using Kafka Client Image: $KAFKA_CLIENT_VERSION"
     echo "Using Kafka Server Image: $KAFKA_SERVER_VERSION"
     
-    # Set up volume mounts for JUnit test results
+    # Set up directories for test results
     mkdir -p "$RESULTS_DIR/${test_id}_junit"
     mkdir -p "$RESULTS_DIR/${test_id}_html" 
     mkdir -p "$RESULTS_DIR/${test_id}_m2"
     
-    export JUNIT_RESULTS_DIR="$RESULTS_DIR/${test_id}_junit"
-    export HTML_RESULTS_DIR="$RESULTS_DIR/${test_id}_html"
-    export MAVEN_REPO_DIR="$RESULTS_DIR/${test_id}_m2"
+    JUNIT_RESULTS_DIR="$RESULTS_DIR/${test_id}_junit"
+    HTML_RESULTS_DIR="$RESULTS_DIR/${test_id}_html"
+    MAVEN_REPO_DIR="$RESULTS_DIR/${test_id}_m2"
     
     echo "JUnit results will be saved to: $JUNIT_RESULTS_DIR"
     echo "HTML reports will be saved to: $HTML_RESULTS_DIR"
