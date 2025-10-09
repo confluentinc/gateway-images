@@ -10,7 +10,7 @@ gateway:
         nodeIdRanges:
           - name: cc-brokers
             start: 0
-            end: 3
+            end: 11
         bootstrapServers:
           - id: cc-bootstrap
             endpoint: "pkc-12576z.us-west2.gcp.confluent.cloud:9092"  # Replace with your CC bootstrap server
