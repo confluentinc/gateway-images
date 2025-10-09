@@ -555,9 +555,13 @@ class EnhancedKroxyliciousMetricsParser:
     """Parse JUnit test results from TXT files"""
     junit_results = {}
     
+    print(f"🔍 Scanning directory: {results_dir}")
+    print(f"📁 Directory contents: {os.listdir(results_dir)}")
+    
     # Look for JUnit result directories
     for item in os.listdir(results_dir):
       if item.endswith('_junit'):
+        print(f"✅ Found JUnit directory: {item}")
         # Extract client and server versions from directory name
         match = re.match(r'java([^_]+)_server([^_]+)_junit', item)
         if match:
@@ -569,12 +573,15 @@ class EnhancedKroxyliciousMetricsParser:
           
           # Parse each virtual cluster's test results
           junit_dir = os.path.join(results_dir, item)
+          print(f"📂 JUnit directory contents: {os.listdir(junit_dir)}")
           for vc_dir in os.listdir(junit_dir):
             vc_path = os.path.join(junit_dir, vc_dir)
             if os.path.isdir(vc_path):
+              print(f"🔍 Virtual cluster: {vc_dir}")
               # Look for TXT test result files
               for file in os.listdir(vc_path):
                 if file.endswith('.txt'):
+                  print(f"📄 Found TXT file: {file}")
                   txt_file = os.path.join(vc_path, file)
                   try:
                     with open(txt_file, 'r') as f:
@@ -582,27 +589,32 @@ class EnhancedKroxyliciousMetricsParser:
                     
                     # Parse the test results line
                     # Format: "Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 36.43 s"
+                    print(f"📝 TXT file content: {content[:200]}...")
                     match = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)', content)
                     if match:
                       tests_run = int(match.group(1))
                       failures = int(match.group(2))
                       errors = int(match.group(3))
                       skipped = int(match.group(4))
+                      print(f"✅ Parsed: Tests={tests_run}, Failures={failures}, Errors={errors}, Skipped={skipped}")
+                    else:
+                      print(f"❌ Could not parse test results from content")
+                      continue
                       
-                      # Map virtual cluster directory names to our standard names
-                      if 'sasl' in vc_dir:
-                        vc_name = 'SASL'
-                      elif 'ssl' in vc_dir:
-                        vc_name = 'SSL'
-                      else:
-                        vc_name = 'PLAINTEXT'
-                      
-                      junit_results[key][vc_name] = {
-                        'tests_run': tests_run,
-                        'failures': failures,
-                        'errors': errors,
-                        'skipped': skipped
-                      }
+                    # Map virtual cluster directory names to our standard names
+                    if 'sasl' in vc_dir:
+                      vc_name = 'SASL'
+                    elif 'ssl' in vc_dir:
+                      vc_name = 'SSL'
+                    else:
+                      vc_name = 'PLAINTEXT'
+                    
+                    junit_results[key][vc_name] = {
+                      'tests_run': tests_run,
+                      'failures': failures,
+                      'errors': errors,
+                      'skipped': skipped
+                    }
                     
                   except Exception as e:
                     print(f"Warning: Error processing JUnit TXT file {txt_file}: {e}")
