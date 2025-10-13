@@ -67,7 +67,7 @@ global_job_config:
       - export DOCKER_UPSTREAM_REGISTRY=$DOCKER_PROD_REGISTRY
       - export LATEST_TAG=$BRANCH_TAG-latest
       - export DOCKER_UPSTREAM_TAG="master-latest"
-      - export DOCKER_REPOS="confluentinc/cpc-gateway"
+      - export DOCKER_REPOS="confluentinc/cpc-gateway confluentinc/confluent-gateway-for-cloud"
       - export MAVEN_EXTRA_ARGS=""
       - export DOCKER_DEV_TAG="dev-$BRANCH_TAG-$BUILD_NUMBER"
       - export AMD_ARCH=.amd64
