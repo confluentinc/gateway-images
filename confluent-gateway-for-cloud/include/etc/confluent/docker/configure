@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. /etc/confluent/docker/bash-config
+
+ub path /etc/"${COMPONENT}"/ writable
+
+# GATEWAY_CONFIG if present, put it /etc/${COMPONENT}/gateway-config.yaml and set GATEWAY_CONFIG_FILE
+if [[ -n "${GATEWAY_CONFIG-}" ]]; then
+  echo "===> Using GATEWAY_CONFIG environment variable"
+  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+  echo "${GATEWAY_CONFIG}" > "${GATEWAY_CONFIG_FILE}"
+else
+  if [[ -n "${GATEWAY_CONFIG_TEMPLATE-}" && -f "${GATEWAY_CONFIG_TEMPLATE}" ]]; then
+    echo "===> Templating configuration file from GATEWAY_CONFIG_TEMPLATE"
+    export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+    ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
+  else
+    echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
+  fi
+fi
