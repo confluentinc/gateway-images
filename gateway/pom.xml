@@ -23,7 +23,7 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- Dependencies from common-docker base image -->
+    <!-- Java dependencies of cp-base-java docker image -->
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>utility-belt</artifactId>

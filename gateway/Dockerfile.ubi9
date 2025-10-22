@@ -11,7 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Stage 1: Build Go utilities
 ARG GOLANG_VERSION
 ARG UBI_MINIMAL_VERSION
 FROM docker.io/golang:${GOLANG_VERSION} AS build-utilities
@@ -19,7 +18,7 @@ FROM docker.io/golang:${GOLANG_VERSION} AS build-utilities
 ENV GO_BIN="/go/bin"
 RUN go install github.com/confluentinc/cp-docker-utils/cmd/ub@master
 
-# Stage 2: Final image with cp-base-java functionality + Gateway
+
 FROM registry.access.redhat.com/ubi9-minimal:${UBI_MINIMAL_VERSION}
 
 ARG PROJECT_VERSION
@@ -53,7 +52,6 @@ ENV COMPONENT_CONFIG_DIR=/etc/confluent-${COMPONENT}
 
 USER root
 
-# Install cp-base-java dependencies (Temurin JRE)
 RUN printf "[temurin-jre] \n\
 name=temurin-jre \n\
 baseurl=https://adoptium.jfrog.io/artifactory/rpm/rhel/\$releasever/\$basearch \n\
@@ -73,7 +71,7 @@ gpgkey=https://adoptium.jfrog.io/artifactory/api/gpg/key/public \n\
 
 COPY --from=build-utilities /go/bin/ub /usr/bin/ub
 
-# Install Gateway
+
 RUN echo "===> Installing ${COMPONENT}..." \
     && rpm --import ${CONFLUENT_PACKAGES_REPO}/archive.key \
     && printf "[Confluent] \n\
@@ -97,13 +95,15 @@ VOLUME ["/var/lib/${COMPONENT}/data", "/etc/${COMPONENT}/secrets"]
 # Copy files from target package to cp-base-new directory for backward compatibility (some paths are hardcoded in CFK startups scripts)
 COPY --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/doc/* /usr/share/doc/cp-base-new/
 COPY --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/java/${ARTIFACT_ID}/* /usr/share/java/cp-base-new/
+
+# /usr/share/java/cp-base-java is the default java classpath for ub
+# jars in cp-base-new and cp-base-java are identical, so create a symlink to avoid duplicating files
 RUN ln -s /usr/share/java/cp-base-new /usr/share/java/cp-base-java
 
-# Copy configuration files
+
 COPY --chown=appuser:appuser include/etc/confluent/docker /etc/confluent/docker
 COPY license.txt /licenses/
 
-# make executable
 RUN chmod +x /etc/confluent/docker/run
 RUN chmod +x /etc/confluent/docker/configure
 
