@@ -22,6 +22,37 @@
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- Java dependencies of cp-base-java docker image -->
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>utility-belt</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>logredactor</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.jolokia</groupId>
+      <artifactId>jolokia-jvm</artifactId>
+    </dependency>
+    
+    <dependency>
+      <groupId>io.prometheus.jmx</groupId>
+      <artifactId>jmx_prometheus_javaagent</artifactId>
+    </dependency>
+    
+    <dependency>
+      <groupId>io.confluent</groupId>
+      <artifactId>disk-usage-agent</artifactId>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
