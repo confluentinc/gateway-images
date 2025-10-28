@@ -47,9 +47,6 @@ services:
     depends_on:
       - kafka-1
     environment:
-      GATEWAY_LICENSES: |
-        invalid.jwt.token
-        token.2
       GATEWAY_CONFIG: | 
         gateway:
           admin:
