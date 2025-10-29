@@ -24,9 +24,10 @@ if [ -z "$GATEWAY_CONFIG_FILE" ]; then
   export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
 fi
 
-# if LICENSES_TXT_PATH is set, add args -l $LICENSES_TXT_PATH
-if [ -n "$LICENSES_TXT_PATH" ]; then
-  export GATEWAY_START_ARGS="-l $LICENSES_TXT_PATH"
+GATEWAY_START_ARGS=""
+if [ -f "/etc/${COMPONENT}/licenses.txt" ]; then
+  echo "===> Using licenses file at /etc/${COMPONENT}/licenses.txt"
+  GATEWAY_START_ARGS="--license-file /etc/${COMPONENT}/licenses.txt"
 fi
 config_content=$(<"${GATEWAY_CONFIG_FILE}")
 echo "Original configuration content:"

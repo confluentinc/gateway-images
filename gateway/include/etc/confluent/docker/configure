@@ -36,6 +36,5 @@ fi
 echo "===> Checking Licenses Text..."
 if [[ -n "${GATEWAY_LICENSES-}" ]]; then
   echo "===> Using GATEWAY_LICENSES environment variable"
-  export LICENSES_TXT_PATH="/etc/${COMPONENT}/licenses.txt"
   echo "${GATEWAY_LICENSES}" > "${LICENSES_TXT_PATH}"
 fi
