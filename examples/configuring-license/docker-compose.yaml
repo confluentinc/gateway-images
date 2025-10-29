@@ -1,6 +1,6 @@
 services:
 
-# Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller. 
+  # Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller.
   kafka-1:
     image: confluentinc/cp-server:latest
     container_name: kafka-1
@@ -28,7 +28,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-  
+
 
       KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
@@ -36,10 +36,10 @@ services:
       KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
 
- # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.  
- # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
- # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication. Broker will perform authentication. 
- # Passthrough routes on Gateway are created for clients to connect to the kafka-1 brokers via the Gateway.
+  # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.
+  # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
+  # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication. Broker will perform authentication.
+  # Passthrough routes on Gateway are created for clients to connect to the kafka-1 brokers via the Gateway.
 
   gateway:
     image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
@@ -62,7 +62,7 @@ services:
       #   docker compose up -d
       # ========================================
 
-      GATEWAY_CONFIG: | 
+      GATEWAY_CONFIG: |
         gateway:
           admin:
             endpoints:
@@ -90,7 +90,7 @@ services:
                 bootstrapServerId: internal-kafka-listener 
               security:
                 auth: passthrough
-            
+        
             # Route 2: Additional passthrough route
             - name: passthrough-route-2
               endpoint: "localhost:29092" 
@@ -101,7 +101,7 @@ services:
                 bootstrapServerId: internal-kafka-listener 
               security:
                 auth: passthrough
-            
+        
             # Route 3: Additional passthrough route
             - name: passthrough-route-3
               endpoint: "localhost:39092" 
@@ -112,7 +112,7 @@ services:
                 bootstrapServerId: internal-kafka-listener 
               security:
                 auth: passthrough
-            
+        
             # Route 4: Additional passthrough route (max for trial mode)
             - name: passthrough-route-4
               endpoint: "localhost:49092" 
@@ -123,7 +123,7 @@ services:
                 bootstrapServerId: internal-kafka-listener 
               security:
                 auth: passthrough
-            
+        
             # Route 5: TRIAL MODE LIMIT - Uncomment to test the 4-route trial limit
             # This 5th route will cause Gateway to fail in trial mode
             # To use this route, you must provide a valid license via GATEWAY_LICENSES
