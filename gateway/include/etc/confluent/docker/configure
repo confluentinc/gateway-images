@@ -32,3 +32,9 @@ else
     echo "===> Using default GATEWAY_CONFIG_FILE: ${GATEWAY_CONFIG_FILE}"
   fi
 fi
+
+echo "===> Checking Licenses Text..."
+if [[ -n "${GATEWAY_LICENSES-}" ]]; then
+  echo "===> Using GATEWAY_LICENSES environment variable"
+  echo "${GATEWAY_LICENSES}" > "${LICENSES_TXT_PATH}"
+fi
