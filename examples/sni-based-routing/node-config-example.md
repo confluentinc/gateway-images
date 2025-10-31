@@ -80,6 +80,7 @@ If using DNS, ensure that the DNS records are set up to resolve the node-specifi
 correctly.
 
 ```
+kafka.gateway.local -> <GATEWAY_LB_ADDRESS>
 *.pod0.kafka.gateway.local -> <POD0_IP_ADDRESS>
 *.pod1.kafka.gateway.local -> <POD1_IP_ADDRESS>
 *.pod2.kafka.gateway.local -> <POD2_IP_ADDRESS>
