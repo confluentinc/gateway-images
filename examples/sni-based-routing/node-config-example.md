@@ -48,7 +48,7 @@ export GATEWAY_NODE_ID="pod0"
 
 ### Result
 
-The configuration will be processed and `$(gatewayNodeId)` will be replaced with `node1`:
+The configuration will be processed and `$(gatewayNodeId)` will be replaced with `pod0`:
 
 ```yaml
 # Generated node-specific configuration
