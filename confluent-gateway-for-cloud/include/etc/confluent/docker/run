@@ -24,4 +24,22 @@ if [ -z "$GATEWAY_CONFIG_FILE" ]; then
   export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
 fi
 
-/usr/bin/gateway-start -c $GATEWAY_CONFIG_FILE "$@"
+config_content=$(<"${GATEWAY_CONFIG_FILE}")
+echo "Original configuration content:"
+echo "${config_content}"
+
+# If GATEWAY_NODE_ID is defined and valid, replace $(gatewayNodeId)
+export GATEWAY_NODE_CONFIG_FILE="/etc/${COMPONENT}/gateway-node-config.yaml"
+if [[ -n "${GATEWAY_NODE_ID-}" && "${GATEWAY_NODE_ID}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "===> Replacing \$(gatewayNodeId) in configuration file with GATEWAY_NODE_ID: ${GATEWAY_NODE_ID}"
+  config_content="${config_content//\$\(gatewayNodeId\)/${GATEWAY_NODE_ID}}"
+  echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
+  echo "Updated configuration content: (saved to ${GATEWAY_NODE_CONFIG_FILE}):"
+  echo "${config_content}"
+else
+  echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
+fi
+
+echo "GATEWAY_NODE_CONFIG_FILE: ${GATEWAY_NODE_CONFIG_FILE} will be used to start the Gateway."
+
+/usr/bin/gateway-start -c $GATEWAY_GATEWAY_NODE_CONFIG_FILE "$@"
