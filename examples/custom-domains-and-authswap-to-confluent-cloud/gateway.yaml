@@ -1,0 +1,107 @@
+gateway:
+  admin:
+    endpoints:
+      metrics: true
+  secretStores:
+    - name: vault-cluster-1
+      provider:
+        type: Vault
+        config:
+          address: http://vault:8200
+          authToken: vault-plaintext-root-token
+          path: secret/cluster-1
+          separator: /
+    - name: vault-cluster-2
+      provider:
+        type: Vault
+        config:
+          address: http://vault:8200
+          authToken: vault-plaintext-root-token
+          path: secret/cluster-2
+          separator: /
+  streamingDomains:
+    - name: cluster-1-domain
+      type: kafka
+      kafkaCluster:
+        name: cluster-1
+        nodeIdRanges:
+          - name: cluster-1-range
+            start: 0 # Be careful of broker-0
+            end: 11
+        bootstrapServers:
+          - id: cluster-1
+            endpoint: "<your-cluster-1-domain>:9092"
+            ssl:
+              truststore:
+                type: PKCS12
+                location: /etc/gateway/ssl/<your-cluster-1-domain>/truststore.p12
+                password:
+                  file: /etc/gateway/ssl/<your-cluster-1-domain>/truststore.password
+    - name: cluster-2-domain
+      type: kafka
+      kafkaCluster:
+        name: cluster-2
+        nodeIdRanges:
+          - name: cluster-2-range
+            start: 0 # Be careful of broker-0
+            end: 11
+        bootstrapServers:
+          - id: cluster-2
+            endpoint: "<your-cluster-2-domain>:9092"
+            ssl:
+              truststore:
+                type: PKCS12
+                location: /etc/gateway/ssl/<your-cluster-2-domain>/truststore.p12
+                password:
+                  file: /etc/gateway/ssl/<your-cluster-2-domain>/truststore.password
+  routes:
+    - name: cluster-1-route
+      endpoint: "cluster-1.confluent.cloud:19002"
+      brokerIdentificationStrategy:
+        type: port
+      streamingDomain:
+        name: cluster-1-domain
+        bootstrapServerId: cluster-1
+      security:
+        auth: swap
+        swapConfig:
+          clientAuth:
+            sasl:
+              mechanism: PLAIN
+              callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
+              jaasConfig:
+                file: /etc/gateway/config/jaas-config-for-gw-authn-cluster-1.conf
+          secretStore: vault-cluster-1
+          clusterAuth:
+            sasl:
+              mechanism: PLAIN
+              callbackHandlerClass: org.apache.kafka.common.security.authenticator.SaslClientCallbackHandler
+              jaasConfig:
+                file: /etc/gateway/config/jaas-template-for-gw-swapping.conf
+    #      logNetwork: true
+    #      logFrames: true
+    - name: cluster-2-route
+      endpoint: "cluster-2.confluent.cloud:19102"
+      brokerIdentificationStrategy:
+        type: port
+      streamingDomain:
+        name: cluster-2-domain
+        bootstrapServerId: cluster-2
+      security:
+        auth: swap
+        swapConfig:
+          clientAuth:
+            sasl:
+              mechanism: PLAIN
+              callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
+              jaasConfig:
+                file: /etc/gateway/config/jaas-config-for-gw-authn-cluster-2.conf
+          secretStore: vault-cluster-2
+          clusterAuth:
+            sasl:
+              mechanism: PLAIN
+              callbackHandlerClass: org.apache.kafka.common.security.authenticator.SaslClientCallbackHandler
+              jaasConfig:
+                file: /etc/gateway/config/jaas-template-for-gw-swapping.conf
+#      logNetwork: true
+#       logFrames: true
