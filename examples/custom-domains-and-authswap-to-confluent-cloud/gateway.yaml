@@ -104,4 +104,4 @@ gateway:
               jaasConfig:
                 file: /etc/gateway/config/jaas-template-for-gw-swapping.conf
 #      logNetwork: true
-#       logFrames: true
+#      logFrames: true
