@@ -1,4 +1,4 @@
-# Custom Domains And Authentitcation Swapping to Confluent Cloud
+# Custom Domains And Authentication Swapping to Confluent Cloud
 
 This example demonstrates how to configure CPC Gateway Custom Domains and Authentication Swapping to proxy traffic to Confluent Cloud clusters.
 
