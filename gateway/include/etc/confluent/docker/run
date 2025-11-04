@@ -50,5 +50,6 @@ fi
 echo "GATEWAY_NODE_CONFIG_FILE: ${GATEWAY_NODE_CONFIG_FILE} will be used to start the Gateway."
 
 GATEWAY_START_ARGS+=("-c $GATEWAY_NODE_CONFIG_FILE")
+echo "${GATEWAY_START_ARGS[@]}"
 
 /usr/bin/gateway-start "${GATEWAY_START_ARGS[@]}" "$@"
