@@ -1,0 +1,26 @@
+gateway:
+  admin:
+    endpoints:
+      metrics: true
+  streamingDomains:
+    - name: sample-domain
+      type: kafka
+      kafkaCluster:
+        name: kafka-cluster-1
+        nodeIdRanges:
+          - name: d
+            start: 1 # 19093, 1
+            end: 5
+        bootstrapServers:
+          - id: localkafka
+            endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
+  routes:
+    - name: passthrough
+      endpoint: "localhost:19092"
+      brokerIdentificationStrategy:
+        type: port # nodeId starts from 19093 and for nodes starting from 1 to 5
+      streamingDomain:
+        name: sample-domain
+        bootstrapServerId: localkafka
+      security:
+        auth: passthrough
