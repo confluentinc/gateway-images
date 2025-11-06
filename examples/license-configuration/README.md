@@ -6,12 +6,14 @@ This example demonstrates how to configure and manage licenses for Confluent Gat
 
 Confluent Gateway supports different deployment models with corresponding license types:
 
-| Gateway Image                     | Required License Type | Use Case                           |
-|-----------------------------------|-----------------------|------------------------------------|
-| `cpc-gateway`                     | CPC License           | For on-premises Kafka clusters     |
-| `confluent-gateway-for-cloud`     | CPC Cloud License     | For Confluent Cloud Kafka clusters |
+| Gateway Image                     | Required License Type    | Use Case                           |
+|-----------------------------------|--------------------------|------------------------------------|
+| `cpc-gateway`                     | CPC License              | For on-premises Kafka clusters     |
+| `confluent-gateway-for-cloud`     | CC Gateway Addon License | For Confluent Cloud Kafka clusters |
 
-> **Note:** You only need to configure one license type based on your deployment target.
+> **Note:** You can configure license type based on your deployment target.
+> 
+> For hybrid deployments, you can provide multiple license tokens.
 
 ---
 
@@ -21,17 +23,16 @@ Confluent Gateway supports different deployment models with corresponding licens
 - **No license required** - Gateway starts automatically in trial mode
 - **Limitation:** Maximum of 4 routes can be configured
 - **Purpose:** Evaluation and testing
-- **Duration:** No time limit
 
-### 🏢 Enterprise Mode for Non-Confluent Cloud Deployments
+### 🏢 Enterprise Mode for Gateway with CPC Deployments
 - **License required:** Valid CPC license token
-- **Capability:** Supports only non-ConfluentCloud streaming domains
-- **Purpose:** Gateway forwarding to self-managed Kafka clusters (open-source and other vendors etc.)
+- **Capability:** Supports only CPC streaming domains
+- **Purpose:** Gateway forwarding to self-managed Kafka clusters
 - **Duration:** As specified in the license claim
 - **Image:** Use `confluentinc/cpc-gateway`
 
-### ☁️ Enterprise Mode for Confluent Cloud Deployments
-- **License required:** Valid Cloud license token
+### ☁️ Enterprise Mode for Gateway with Confluent-Cloud Deployments
+- **License required:** Valid CC Gateway Addon license token
 - **Capability:** Supports only ConfluentCloud streaming domains
 - **Purpose:** Gateway forwarding to Confluent Cloud clusters
 - **Duration:** As specified in the license claim
@@ -51,35 +52,9 @@ Confluent Gateway supports different deployment models with corresponding licens
 
 ---
 
-## Architecture
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Gateway                             │
-│  ┌────────────────┬────────────────┬────────────────┐       │
-│  │ Route 1        │ Route 2        │ Route 3        │ ...   │
-│  │ localhost:19092│ localhost:29092│ localhost:39092│       │
-│  └───────┬────────┴───────┬────────┴───────┬────────┘       │
-│          │                │                │                │
-│          └────────────────┼────────────────┘                │
-│                           │                                 │
-│                  ┌────────▼────────┐                        │
-│                  │ sample-domain   │                        │
-│                  │ (kafka-cluster) │                        │
-│                  └────────┬────────┘                        │
-└───────────────────────────┼─────────────────────────────────┘
-                            │
-                   ┌────────▼────────┐
-                   │  Kafka Broker   │
-                   │  kafka-1:44444  │
-                   │  (SASL/PLAIN)   │
-                   └─────────────────┘
-```
-
----
-
 ## Prerequisites
 
-- **Docker Desktop** (or Docker Engine) with Compose v2
+- **Docker Desktop**
 - **macOS/Linux shell** environment
 - **(Optional)** Valid Confluent license token for enterprise mode
 
@@ -105,6 +80,7 @@ To use enterprise mode, configure the `GATEWAY_LICENSES` environment variable wi
 **Option A: Set environment variable before starting**
 ```bash
 export GATEWAY_LICENSES="your-license-token-here"
+# export GATEWAY_LICENSES=$'your-license-token-here\nyour-second-license-token-here'  # For multiple tokens
 ./start.sh
 ```
 
@@ -138,21 +114,6 @@ This example configures **4 passthrough routes** to demonstrate the trial mode l
 - **Authentication:** Passthrough (authentication handled by Kafka broker)
 - **Broker Identification:** Port-based strategy
 - **Streaming Domain:** sample-domain → kafka-1:44444
-
-### Understanding the 4-Route Configuration
-
-The example intentionally configures 4 routes to demonstrate the trial mode limitation. A 5th route (commented out in `docker-compose.yaml`) would cause the Gateway to fail in trial mode:
-```yaml
-# This 5th route will fail in trial mode:
-# - name: passthrough-route-5
-#   endpoint: "localhost:59092"
-#   ...
-```
-
-**To test the trial mode limit:**
-1. Start Gateway in trial mode (without license)
-2. Uncomment the 5th route in `docker-compose.yaml`
-3. Restart: Gateway will fail to start with an error about route limits
 
 ---
 
@@ -333,7 +294,7 @@ docker container prune -f
 
 ### Issue: Wrong license type for deployment
 
-**Cause:** Using CPC license for Confluent Cloud or vice versa.
+**Cause:** Using CPC license for CC Gateway Addon or vice versa.
 
 **Solution:**
 - For on-premises Kafka: Use `confluentinc/cpc-gateway` image with CPC license
