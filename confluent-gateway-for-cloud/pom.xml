@@ -7,7 +7,7 @@
   <parent>
     <groupId>io.confluent.gateway-images</groupId>
     <artifactId>cpc-gateway-images-parent</artifactId>
-    <version>1.1.0-0</version>
+    <version>1.2.0-0</version>
   </parent>
   <artifactId>confluent-gateway-for-cloud</artifactId>
   <name>Gateway Docker Image</name>
