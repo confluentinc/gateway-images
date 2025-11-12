@@ -117,7 +117,7 @@
         <docker.file>Dockerfile.ubi9</docker.file>
         
         <!-- New properties for our custom Dockerfile -->
-        <ubi9-minimal.image.version>9.7-1762180032</ubi9-minimal.image.version>
+        <ubi9-minimal.image.version>9.7-1762956380</ubi9-minimal.image.version>
         <ubi9-minimal.temurin-21-jdk.version>21.0.9.0.0.10-0</ubi9-minimal.temurin-21-jdk.version>
         <golang.image.version>1.25.4-trixie</golang.image.version>
 
