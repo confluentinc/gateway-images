@@ -83,6 +83,7 @@
                         <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
                         <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
                         <TEMURIN_JDK_VERSION>-${ubi9-minimal.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
+                        <CP_DOCKER_UTILS_VERSION>${git-repo.cp-docker-utils.tag}</CP_DOCKER_UTILS_VERSION>
                     </buildArgs>
                 </configuration>
             </plugin>
@@ -99,6 +100,7 @@
                                     <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
                                     <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
                                     <TEMURIN_JDK_VERSION>-${ubi9-minimal.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
+                                    <CP_DOCKER_UTILS_VERSION>${git-repo.cp-docker-utils.tag}</CP_DOCKER_UTILS_VERSION>
                                 </args>
                             </build>
                         </image>
@@ -115,10 +117,47 @@
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
         <docker.file>Dockerfile.ubi9</docker.file>
-        
-        <!-- New properties for our custom Dockerfile -->
+
+        <!-- ============================================================ -->
+        <!-- AUTOMATED VERSION UPDATE PROPERTY NAMING CONVENTIONS         -->
+        <!-- ============================================================ -->
+        <!--
+        Properties in this section follow specific naming patterns that enable automated version updates:
+
+        1. Base Image Versions:
+           Pattern: ubi<version>-<variant>.image.version
+           Example: ubi8-minimal.image.version
+           Updates: Latest tag available for the specified UBI base image
+
+        2. OS Package Versions:
+           Pattern: ubi<version>-<variant>.<package-name>.version
+           Example: ubi8-minimal.openssl.version
+           Updates: Latest version of the package available in the specified UBI image
+
+        3. GitHub Repository Tags:
+           Pattern: git-repo.<confluentinc-repo-name>.version
+           Example: git-repo.confluent-docker-utils.tag
+           Updates: Highest semantic version tag in format v{int}.{int}.{int} from the repository
+
+        4. Docker Hub Images:
+           Pattern: <image-name>.image.version
+           Example: golang.image.version
+           Updates: Latest image tag available on Docker Hub
+
+        When adding new properties for automated updates, follow these naming conventions to ensure
+        the automation tooling can correctly identify and update them.
+        -->
+
+        <!-- Base Image Versions -->
         <ubi9-minimal.image.version>9.7-1762956380</ubi9-minimal.image.version>
+
+        <!-- OS Package Versions -->
         <ubi9-minimal.temurin-21-jdk.version>21.0.9.0.0.10-0</ubi9-minimal.temurin-21-jdk.version>
+
+        <!-- GitHub Repository Tags -->
+        <git-repo.cp-docker-utils.tag>v1.0.1</git-repo.cp-docker-utils.tag>
+
+        <!-- Docker Hub Images -->
         <golang.image.version>1.25.4-trixie</golang.image.version>
 
     </properties>
