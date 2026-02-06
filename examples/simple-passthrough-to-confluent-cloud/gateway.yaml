@@ -15,7 +15,7 @@ gateway:
           - id: cc-bootstrap
             endpoint: "pkc-12576z.us-west2.gcp.confluent.cloud:9092"  # Replace with your CC bootstrap server
             ssl:
-              truststore: # Confluent Cloud cert is present in Public CAs, so default truststore works
+              truststore: # Confluent Cloud cert is signed by Public CAs, so default truststore works
   routes:
     - name: cc-passthrough-route
       endpoint: "localhost:19092"
