@@ -10,10 +10,10 @@ gateway:
         nodeIdRanges:
           - name: cc-brokers
             start: 0
-            end: 30
+            end: 11
         bootstrapServers:
           - id: cc-bootstrap
-            endpoint: "pkc-n98pk.us-west-2.aws.confluent.cloud:9092"  # Replace with your CC bootstrap server
+            endpoint: "pkc-12576z.us-west2.gcp.confluent.cloud:9092"  # Replace with your CC bootstrap server
             ssl:
               truststore: # Confluent Cloud cert is present in Public CAs, so default truststore works
   routes:
