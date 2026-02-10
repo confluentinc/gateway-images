@@ -32,8 +32,6 @@ if [ -f "/etc/${COMPONENT}/licenses.txt" ]; then
 fi
 
 config_content=$(<"${GATEWAY_CONFIG_FILE}")
-echo "Original configuration content:"
-echo "${config_content}"
 
 # If GATEWAY_NODE_ID is defined and valid, replace $(gatewayNodeId)
 export GATEWAY_NODE_CONFIG_FILE="/etc/${COMPONENT}/gateway-node-config.yaml"
