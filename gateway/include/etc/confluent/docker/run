@@ -40,7 +40,9 @@ if [[ -n "${GATEWAY_NODE_ID-}" && "${GATEWAY_NODE_ID}" =~ ^[a-zA-Z0-9_-]+$ ]]; t
   config_content="${config_content//\$\(gatewayNodeId\)/${GATEWAY_NODE_ID}}"
   echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
   echo "Updated configuration content: (saved to ${GATEWAY_NODE_CONFIG_FILE}):"
-  echo "${config_content}"
+  # obfuscate any sensitive information in the configuration content before printing
+  obfuscated_config_content=$(echo "${config_content}" | sed -E 's/(password|secret|key|token|value)[=:][^,]+/\1=****/gi')
+  echo "${obfuscated_config_content}"
 else
   echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
 fi
