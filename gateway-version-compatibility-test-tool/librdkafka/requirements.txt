@@ -1,0 +1,4 @@
+confluent-kafka
+pytest
+pytest-html
+pytest-timeout
