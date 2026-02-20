@@ -10,6 +10,8 @@ ARG LIBRDKAFKA_VERSION
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
+        libc6-dev \
+        librdkafka-dev \
         libssl-dev \
         libffi-dev \
         curl && \
