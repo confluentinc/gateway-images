@@ -1,5 +1,6 @@
-# Basic Gateway configuration for SNI-based routing with TLS
-# For multi-node setups, see gateway-wildcard.yaml or gateway-node-specific.yaml
+# Gateway configuration example using GLOBAL wildcard certificates
+# This configuration supports ALL gateway nodes with a single global wildcard certificate
+# Certificate covers: *.kafka.gateway.local
 gateway:
   admin:
     endpoints:
@@ -17,7 +18,8 @@ gateway:
       endpoint: "kafka.gateway.local:19092"
       brokerIdentificationStrategy:
         type: host
-        # Single node pattern - for multi-node use: "broker$(nodeId).$(gatewayNodeId).kafka.gateway.local"
+        # Global wildcard certificate supports this pattern across all nodes
+        # However, you need to use a simpler pattern for global wildcard to work
         pattern: "broker$(nodeId).kafka.gateway.local"
       streamingDomain:
         name: sample-domain
