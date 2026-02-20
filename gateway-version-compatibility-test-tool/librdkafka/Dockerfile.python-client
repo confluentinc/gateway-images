@@ -21,7 +21,6 @@ RUN apt-get update && \
 RUN mkdir -p /junit-results /html-results /tests
 
 # Copy test files
-COPY requirements.txt /tests/
 COPY conftest.py /tests/
 COPY test_librdkafka_compatibility.py /tests/
 
