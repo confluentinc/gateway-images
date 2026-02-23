@@ -67,7 +67,7 @@ semaphore:
           required: false
           description: "Kafka client version to test against, e.g., 8.0.0"
     - name: librdkafka-version-compatibility-tests
-      branch: librdKafkaTest
+      branch: master
       at: "0 21 * * 1"    # Mon at 21:00 UTC
       pipeline_file: .semaphore/librdkafka_version_compatibility_tests.yml
       parameters:
