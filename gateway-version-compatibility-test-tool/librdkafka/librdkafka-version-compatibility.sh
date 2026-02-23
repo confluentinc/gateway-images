@@ -20,7 +20,7 @@ version_ge() {  # $1 >= $2 ?
 }
 
 # =============================================================================
-# SSL CERTIFICATE GENERATION (reuse from parent directory)
+# SSL CERTIFICATE GENERATION
 # =============================================================================
 
 ensure_ssl_certificates() {

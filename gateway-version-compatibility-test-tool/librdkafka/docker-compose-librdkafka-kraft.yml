@@ -154,7 +154,7 @@ services:
       retries: 3
       start_period: 30s
 
-  # Python client container (replaces Java kafka-client-test)
+  # Python client container
   librdkafka-client-test:
     build:
       context: .
