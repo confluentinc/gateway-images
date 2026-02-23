@@ -143,8 +143,8 @@ class EnhancedKroxyliciousMetricsParser:
       print(f"Processing: {metrics_file}")
 
       # Extract version info from filename
-      # Format: java7.4.0_server7.4.0_metrics.txt
-      match = re.match(r'java([^_]+)_server([^_]+)_metrics\.txt',
+      # Format: java7.4.0_server7.4.0_metrics.txt or librdkafka2.13.0_server7.9.0_metrics.txt
+      match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_metrics\.txt',
                        metrics_file)
       if not match:
         print(f"Warning: Could not parse version info from {metrics_file}")
@@ -563,7 +563,7 @@ class EnhancedKroxyliciousMetricsParser:
       if item.endswith('_junit'):
         print(f"✅ Found JUnit directory: {item}")
         # Extract client and server versions from directory name
-        match = re.match(r'java([^_]+)_server([^_]+)_junit', item)
+        match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_junit', item)
         if match:
           client_version = match.group(1)
           server_version = match.group(2)
