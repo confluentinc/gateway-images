@@ -1,0 +1,34 @@
+# Python client image for librdkafka version compatibility testing
+# Installs confluent-kafka-python (which bundles librdkafka) at a specific version
+
+ARG LIBRDKAFKA_VERSION=2.13.0
+FROM python:3.11-slim
+
+ARG LIBRDKAFKA_VERSION
+
+# Install system dependencies required by confluent-kafka (librdkafka C extension)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libc6-dev \
+        librdkafka-dev \
+        libssl-dev \
+        libffi-dev \
+        curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create directories for test results
+RUN mkdir -p /junit-results /html-results /tests
+
+# Copy test files
+COPY conftest.py /tests/
+COPY test_librdkafka_compatibility.py /tests/
+
+WORKDIR /tests
+
+# Install the specific version of confluent-kafka and test dependencies
+RUN pip install --no-cache-dir confluent-kafka==${LIBRDKAFKA_VERSION} && \
+    pip install --no-cache-dir pytest pytest-html pytest-timeout
+
+# Default command
+CMD ["sh", "-c", "sleep infinity"]
