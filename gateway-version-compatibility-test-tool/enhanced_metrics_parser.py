@@ -143,8 +143,8 @@ class EnhancedKroxyliciousMetricsParser:
       print(f"Processing: {metrics_file}")
 
       # Extract version info from filename
-      # Format: java7.4.0_server7.4.0_metrics.txt
-      match = re.match(r'java([^_]+)_server([^_]+)_metrics\.txt',
+      # Format: java7.4.0_server7.4.0_metrics.txt or librdkafka2.13.0_server7.9.0_metrics.txt
+      match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_metrics\.txt',
                        metrics_file)
       if not match:
         print(f"Warning: Could not parse version info from {metrics_file}")
@@ -563,7 +563,7 @@ class EnhancedKroxyliciousMetricsParser:
       if item.endswith('_junit'):
         print(f"✅ Found JUnit directory: {item}")
         # Extract client and server versions from directory name
-        match = re.match(r'java([^_]+)_server([^_]+)_junit', item)
+        match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_junit', item)
         if match:
           client_version = match.group(1)
           server_version = match.group(2)
@@ -618,6 +618,34 @@ class EnhancedKroxyliciousMetricsParser:
                     
                   except Exception as e:
                     print(f"Warning: Error processing JUnit TXT file {txt_file}: {e}")
+                elif file.endswith('.xml'):
+                  xml_file = os.path.join(vc_path, file)
+                  try:
+                    import xml.etree.ElementTree as ET
+                    tree = ET.parse(xml_file)
+                    root = tree.getroot()
+                    suite = root.find('testsuite') if root.tag == 'testsuites' else root
+                    tests_run = int(suite.get('tests', 0))
+                    failures = int(suite.get('failures', 0))
+                    errors = int(suite.get('errors', 0))
+                    skipped = int(suite.get('skipped', 0))
+                    print(f"✅ Parsed XML: Tests={tests_run}, Failures={failures}, Errors={errors}, Skipped={skipped}")
+
+                    if 'sasl' in vc_dir:
+                      vc_name = 'SASL'
+                    elif 'ssl' in vc_dir:
+                      vc_name = 'SSL'
+                    else:
+                      vc_name = 'PLAINTEXT'
+
+                    junit_results[key][vc_name] = {
+                      'tests_run': tests_run,
+                      'failures': failures,
+                      'errors': errors,
+                      'skipped': skipped
+                    }
+                  except Exception as e:
+                    print(f"Warning: Error processing JUnit XML file {xml_file}: {e}")
     
     return junit_results
 
