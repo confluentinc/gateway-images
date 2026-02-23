@@ -618,6 +618,34 @@ class EnhancedKroxyliciousMetricsParser:
                     
                   except Exception as e:
                     print(f"Warning: Error processing JUnit TXT file {txt_file}: {e}")
+                elif file.endswith('.xml'):
+                  xml_file = os.path.join(vc_path, file)
+                  try:
+                    import xml.etree.ElementTree as ET
+                    tree = ET.parse(xml_file)
+                    root = tree.getroot()
+                    suite = root.find('testsuite') if root.tag == 'testsuites' else root
+                    tests_run = int(suite.get('tests', 0))
+                    failures = int(suite.get('failures', 0))
+                    errors = int(suite.get('errors', 0))
+                    skipped = int(suite.get('skipped', 0))
+                    print(f"✅ Parsed XML: Tests={tests_run}, Failures={failures}, Errors={errors}, Skipped={skipped}")
+
+                    if 'sasl' in vc_dir:
+                      vc_name = 'SASL'
+                    elif 'ssl' in vc_dir:
+                      vc_name = 'SSL'
+                    else:
+                      vc_name = 'PLAINTEXT'
+
+                    junit_results[key][vc_name] = {
+                      'tests_run': tests_run,
+                      'failures': failures,
+                      'errors': errors,
+                      'skipped': skipped
+                    }
+                  except Exception as e:
+                    print(f"Warning: Error processing JUnit XML file {xml_file}: {e}")
     
     return junit_results
 
