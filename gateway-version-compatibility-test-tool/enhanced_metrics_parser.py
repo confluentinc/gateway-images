@@ -143,8 +143,8 @@ class EnhancedKroxyliciousMetricsParser:
       print(f"Processing: {metrics_file}")
 
       # Extract version info from filename
-      # Format: java7.4.0_server7.4.0_metrics.txt
-      match = re.match(r'java([^_]+)_server([^_]+)_metrics\.txt',
+      # Format: java7.4.0_server7.4.0_metrics.txt or librdkafka2.13.0_server7.9.0_metrics.txt
+      match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_metrics\.txt',
                        metrics_file)
       if not match:
         print(f"Warning: Could not parse version info from {metrics_file}")
@@ -551,74 +551,101 @@ class EnhancedKroxyliciousMetricsParser:
     
     return json_file
 
+  @staticmethod
+  def _get_auth_mode(vc_dir):
+    """Map virtual cluster directory name to auth mode"""
+    if 'sasl' in vc_dir:
+      return 'SASL'
+    if 'ssl' in vc_dir:
+      return 'SSL'
+    return 'PLAINTEXT'
+
+  @staticmethod
+  def _parse_txt_junit(filepath):
+    """Parse a Maven Surefire TXT result file. Returns dict or None."""
+    try:
+      with open(filepath, 'r') as f:
+        content = f.read()
+      print(f"📝 TXT file content: {content[:200]}...")
+      match = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)', content)
+      if not match:
+        print("❌ Could not parse test results from content")
+        return None
+      result = {
+        'tests_run': int(match.group(1)),
+        'failures': int(match.group(2)),
+        'errors': int(match.group(3)),
+        'skipped': int(match.group(4)),
+      }
+      print(f"✅ Parsed: Tests={result['tests_run']}, Failures={result['failures']}, Errors={result['errors']}, Skipped={result['skipped']}")
+      return result
+    except Exception as e:
+      print(f"Warning: Error processing JUnit TXT file {filepath}: {e}")
+      return None
+
+  @staticmethod
+  def _parse_xml_junit(filepath):
+    """Parse a JUnit XML result file (pytest format). Returns dict or None."""
+    try:
+      import xml.etree.ElementTree as ET
+      tree = ET.parse(filepath)
+      root = tree.getroot()
+      suite = root.find('testsuite') if root.tag == 'testsuites' else root
+      result = {
+        'tests_run': int(suite.get('tests', 0)),
+        'failures': int(suite.get('failures', 0)),
+        'errors': int(suite.get('errors', 0)),
+        'skipped': int(suite.get('skipped', 0)),
+      }
+      print(f"✅ Parsed XML: Tests={result['tests_run']}, Failures={result['failures']}, Errors={result['errors']}, Skipped={result['skipped']}")
+      return result
+    except Exception as e:
+      print(f"Warning: Error processing JUnit XML file {filepath}: {e}")
+      return None
+
+  def _parse_vc_results(self, vc_path, vc_dir):
+    """Parse test results for a single virtual cluster directory. Returns dict or None."""
+    for file in os.listdir(vc_path):
+      filepath = os.path.join(vc_path, file)
+      if file.endswith('.txt'):
+        print(f"📄 Found TXT file: {file}")
+        result = self._parse_txt_junit(filepath)
+        if result:
+          return result
+      elif file.endswith('.xml'):
+        result = self._parse_xml_junit(filepath)
+        if result:
+          return result
+    return None
+
   def parse_junit_results(self, results_dir):
-    """Parse JUnit test results from TXT files"""
+    """Parse JUnit test results from TXT and XML files"""
     junit_results = {}
-    
+
     print(f"🔍 Scanning directory: {results_dir}")
     print(f"📁 Directory contents: {os.listdir(results_dir)}")
-    
-    # Look for JUnit result directories
+
     for item in os.listdir(results_dir):
-      if item.endswith('_junit'):
-        print(f"✅ Found JUnit directory: {item}")
-        # Extract client and server versions from directory name
-        match = re.match(r'java([^_]+)_server([^_]+)_junit', item)
-        if match:
-          client_version = match.group(1)
-          server_version = match.group(2)
-          key = f"{client_version}-{server_version}"
-          
-          junit_results[key] = {}
-          
-          # Parse each virtual cluster's test results
-          junit_dir = os.path.join(results_dir, item)
-          print(f"📂 JUnit directory contents: {os.listdir(junit_dir)}")
-          for vc_dir in os.listdir(junit_dir):
-            vc_path = os.path.join(junit_dir, vc_dir)
-            if os.path.isdir(vc_path):
-              print(f"🔍 Virtual cluster: {vc_dir}")
-              # Look for TXT test result files
-              for file in os.listdir(vc_path):
-                if file.endswith('.txt'):
-                  print(f"📄 Found TXT file: {file}")
-                  txt_file = os.path.join(vc_path, file)
-                  try:
-                    with open(txt_file, 'r') as f:
-                      content = f.read()
-                    
-                    # Parse the test results line
-                    # Format: "Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 36.43 s"
-                    print(f"📝 TXT file content: {content[:200]}...")
-                    match = re.search(r'Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)', content)
-                    if match:
-                      tests_run = int(match.group(1))
-                      failures = int(match.group(2))
-                      errors = int(match.group(3))
-                      skipped = int(match.group(4))
-                      print(f"✅ Parsed: Tests={tests_run}, Failures={failures}, Errors={errors}, Skipped={skipped}")
-                    else:
-                      print(f"❌ Could not parse test results from content")
-                      continue
-                      
-                    # Map virtual cluster directory names to our standard names
-                    if 'sasl' in vc_dir:
-                      vc_name = 'SASL'
-                    elif 'ssl' in vc_dir:
-                      vc_name = 'SSL'
-                    else:
-                      vc_name = 'PLAINTEXT'
-                    
-                    junit_results[key][vc_name] = {
-                      'tests_run': tests_run,
-                      'failures': failures,
-                      'errors': errors,
-                      'skipped': skipped
-                    }
-                    
-                  except Exception as e:
-                    print(f"Warning: Error processing JUnit TXT file {txt_file}: {e}")
-    
+      if not item.endswith('_junit'):
+        continue
+      print(f"✅ Found JUnit directory: {item}")
+      match = re.match(r'(?:java|librdkafka)([^_]+)_server([^_]+)_junit', item)
+      if not match:
+        continue
+      key = f"{match.group(1)}-{match.group(2)}"
+      junit_results[key] = {}
+
+      junit_dir = os.path.join(results_dir, item)
+      print(f"📂 JUnit directory contents: {os.listdir(junit_dir)}")
+      for vc_dir in os.listdir(junit_dir):
+        vc_path = os.path.join(junit_dir, vc_dir)
+        if not os.path.isdir(vc_path):
+          continue
+        print(f"🔍 Virtual cluster: {vc_dir}")
+        result = self._parse_vc_results(vc_path, vc_dir)
+        if result:
+          junit_results[key][self._get_auth_mode(vc_dir)] = result
+
     return junit_results
 
 
