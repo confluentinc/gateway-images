@@ -23,12 +23,10 @@ from confluent_kafka.admin import (
 
 logger = logging.getLogger(__name__)
 
-
 def get_librdkafka_version():
     """Return the bundled librdkafka version string."""
     import confluent_kafka
     return confluent_kafka.libversion()[0]
-
 
 # ---------------------------------------------------------------------------
 # Helper utilities
@@ -38,7 +36,6 @@ def delivery_callback(err, msg):
     """Shared delivery callback that raises on error."""
     if err is not None:
         raise KafkaException(err)
-
 
 def produce_messages(producer_config, topic, count, *, partition=None, key_prefix="key", value_prefix="msg"):
     """Produce `count` messages and return list of (partition, offset) tuples."""
@@ -69,7 +66,6 @@ def produce_messages(producer_config, topic, count, *, partition=None, key_prefi
     assert len(results) == count, f"Expected {count} delivered messages, got {len(results)}"
     return results
 
-
 def consume_messages(consumer_config, topic, expected_count, timeout_sec=15):
     """Consume up to `expected_count` messages within `timeout_sec`."""
     c = Consumer(consumer_config)
@@ -90,11 +86,6 @@ def consume_messages(consumer_config, topic, expected_count, timeout_sec=15):
         c.close()
     return messages
 
-
-# ===========================================================================
-# Test: API Versions / Cluster Metadata  (Java: testAPIVersions, Order 10)
-# ===========================================================================
-
 class TestAPIVersions:
     """Verify basic admin API connectivity through the gateway."""
 
@@ -109,11 +100,6 @@ class TestAPIVersions:
 
         logger.info("Cluster ID: %s, Brokers: %d, Topics: %d",
                      metadata.cluster_id, len(metadata.brokers), len(metadata.topics))
-
-
-# ===========================================================================
-# Test: Cluster Metadata  (Java: testClusterMetadata, Order 13)
-# ===========================================================================
 
 class TestClusterMetadata:
     """Detailed cluster metadata inspection."""
@@ -140,11 +126,6 @@ class TestClusterMetadata:
 
         assert controller_id in broker_ids, "Controller should be one of the brokers"
         logger.info("Cluster metadata test passed")
-
-
-# ===========================================================================
-# Test: Topic Management  (Java: testTopicManagement, Order 11)
-# ===========================================================================
 
 class TestTopicManagement:
     """Full topic CRUD lifecycle through admin API."""
@@ -183,11 +164,6 @@ class TestTopicManagement:
         assert topic_name not in md.topics, "Deleted topic should not appear in topic list"
         logger.info("Topic management test passed")
 
-
-# ===========================================================================
-# Test: Basic Producer-Consumer  (Java: testBasicProducerConsumer, Order 2)
-# ===========================================================================
-
 class TestBasicProducerConsumer:
     """Produce one message, consume it, verify content matches."""
 
@@ -224,11 +200,6 @@ class TestBasicProducerConsumer:
         assert msg.offset() >= 0
         logger.info("Basic producer-consumer test passed")
 
-
-# ===========================================================================
-# Test: Idempotent Producer  (Java: testIdempotentProducer, Order 4)
-# ===========================================================================
-
 class TestIdempotentProducer:
     """Enable idempotence and verify sequential offsets."""
 
@@ -257,11 +228,6 @@ class TestIdempotentProducer:
             assert offsets[i] > offsets[i - 1], \
                 f"Offset {offsets[i]} should be > {offsets[i-1]}"
         logger.info("Idempotent producer test passed, offsets: %s", offsets)
-
-
-# ===========================================================================
-# Test: Exactly-Once Semantics  (Java: testExactlyOnceSemantics, Order 5)
-# ===========================================================================
 
 class TestExactlyOnceSemantics:
     """Transactional produce: commit and abort."""
@@ -306,11 +272,6 @@ class TestExactlyOnceSemantics:
         assert len(msgs) == 5, f"Should consume exactly 5 committed messages, got {len(msgs)}"
         logger.info("Exactly-once semantics test passed")
 
-
-# ===========================================================================
-# Test: Custom Serializers  (Java: testCustomSerializers, Order 7)
-# ===========================================================================
-
 class TestCustomSerializers:
     """Produce/consume with raw byte payloads."""
 
@@ -340,11 +301,6 @@ class TestCustomSerializers:
         assert len(received_bytes) > 0
         assert received_bytes.decode("utf-8") == sent_value
         logger.info("Custom serializers test passed")
-
-
-# ===========================================================================
-# Test: Quotas Handling  (Java: testQuotasHandling, Order 8)
-# ===========================================================================
 
 class TestQuotasHandling:
     """Send a burst of messages rapidly to exercise quota/throttle path."""
@@ -383,11 +339,6 @@ class TestQuotasHandling:
         throughput = message_count / duration
         logger.info("Quota test: %d sent, %d ok, %d errors, %.1f msg/s",
                      message_count, success_count, len(errors_list), throughput)
-
-
-# ===========================================================================
-# Test: Rate Limiting  (Java: testRateLimiting, Order 9)
-# ===========================================================================
 
 class TestRateLimiting:
     """Send messages in batches with controlled timing."""
@@ -440,11 +391,6 @@ class TestRateLimiting:
         logger.info("Rate limiting test: %d msgs in %.1fs (%.1f msg/s)",
                      total_messages, total_duration, throughput)
 
-
-# ===========================================================================
-# Test: Consumer Groups  (Java: testConsumerGroups, Order 12)
-# ===========================================================================
-
 class TestConsumerGroups:
     """List and describe consumer groups via admin API."""
 
@@ -482,11 +428,6 @@ class TestConsumerGroups:
                          desc.group_id, desc.state, len(desc.members))
 
         logger.info("Consumer groups test passed")
-
-
-# ===========================================================================
-# Test: Admin Operations  (Java: testAdminOperations, Order 3)
-# ===========================================================================
 
 class TestAdminOperations:
     """Create topic, describe/alter config, increase partitions, delete records, delete topic."""
@@ -568,11 +509,6 @@ class TestAdminOperations:
         fs = a.delete_topics([topic_name])
         fs[topic_name].result(timeout=10)
         logger.info("Admin operations test passed")
-
-
-# ===========================================================================
-# Test: Consumer Operations  (Java: testConsumerOperations, Order 14)
-# ===========================================================================
 
 class TestConsumerOperations:
     """Manual offset, seek, pause/resume, lag monitoring."""
