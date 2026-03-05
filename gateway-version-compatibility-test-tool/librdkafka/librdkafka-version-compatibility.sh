@@ -223,14 +223,57 @@ run_compatibility_test() {
     sleep 5
     curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
 
-    # Cleanup
+    # Cleanup main compose
     docker-compose -f "$COMPOSE_FILE" down -v
+
+    # Test 4: REAUTH (KIP-368 client<->gateway reauth via AuthSwap)
+    echo "--- REAUTH (AuthSwap gateway:19092) ---"
+
+    # Reset the gateway JAAS config so every run starts with user1 present
+    cat > "$PARENT_DIR/configs/jaas-gw-authn.conf" << 'EOF'
+org.apache.kafka.common.security.plain.PlainLoginModule required user_user1="user1-secret";
+EOF
+
+    REAUTH_EXIT_CODE=0
+    set +e
+    if ! docker-compose -f docker-compose-librdkafka-reauth-kraft.yml up -d --build; then
+        echo "REAUTH_SETUP_FAILED: reauth docker-compose failed to start"
+        REAUTH_EXIT_CODE=1
+    elif ! curl -s "$GATEWAY_METRICS" > /dev/null; then
+        echo "REAUTH_SETUP_FAILED: Gateway not responding"
+        docker-compose -f docker-compose-librdkafka-reauth-kraft.yml down -v
+        REAUTH_EXIT_CODE=1
+    else
+        docker exec librdkafka-client-test bash -c "
+            cd /tests &&
+            REAUTH_BOOTSTRAP_SERVERS=gateway:19092 \
+            REAUTH_SASL_USERNAME=user1 \
+            REAUTH_SASL_PASSWORD=user1-secret \
+            GATEWAY_JAAS_CONFIG_PATH=/mutable-configs/jaas-gw-authn.conf \
+            pytest test_librdkafka_compatibility.py::TestReauth \
+                --junitxml=/junit-results/reauth/results.xml \
+                --timeout=90 \
+                -v
+        "
+        REAUTH_EXIT_CODE=$?
+        docker cp librdkafka-client-test:/junit-results/reauth/ "$JUNIT_RESULTS_DIR/" 2>/dev/null || true
+        docker-compose -f docker-compose-librdkafka-reauth-kraft.yml down -v
+    fi
+    set -e
+
+    if [ $REAUTH_EXIT_CODE -ne 0 ]; then
+        OVERALL_EXIT_CODE=1
+        echo "REAUTH tests failed"
+    else
+        echo "REAUTH tests passed"
+    fi
 
     if [ $OVERALL_EXIT_CODE -ne 0 ]; then
         echo "FAILED: One or more auth modes failed" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "PLAINTEXT_EXIT=$PLAINTEXT_EXIT_CODE" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "SASL_EXIT=$SASL_ADMIN_EXIT_CODE" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "SSL_EXIT=$SSL_EXIT_CODE" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "REAUTH_EXIT=$REAUTH_EXIT_CODE" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
         return 1
     fi
@@ -335,8 +378,8 @@ case "${1:-}" in
         ;;
     *)
         echo "Usage:"
-        echo "  $0 --run                           # Run all ${#CLIENTS[@]}x${#SERVERS[@]} test combinations"
-        echo "  $0 --single 2.6.2 7.8.0            # Test single combination"
+        echo "  $0 --run                           # Run all ${#CLIENTS[@]}x${#SERVERS[@]} combinations (PLAINTEXT, SASL, SSL, Reauth)"
+        echo "  $0 --single 2.6.2 7.8.0            # Test single combination (PLAINTEXT, SASL, SSL, Reauth)"
         echo "  $0 --parse results_dir              # Parse existing results"
         echo "  $0 --setup-env                      # Set up Python environment only"
         ;;

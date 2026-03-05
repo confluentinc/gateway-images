@@ -9,6 +9,8 @@ Does NOT cover: Kafka Streams (Java-only, not supported by librdkafka).
 """
 
 import logging
+import os
+import threading
 import time
 import pytest
 
@@ -682,3 +684,152 @@ class TestConsumerOperations:
         logger.info("Total consumer lag: %d", total_lag)
         c.close()
         logger.info("Consumer lag monitoring test passed")
+
+
+# ---------------------------------------------------------------------------
+# Reauth helpers  (used by TestReauth only)
+# ---------------------------------------------------------------------------
+
+class _AsyncProduceResults:
+    """Thread-safe container for async producer outcome."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._produced = 0
+        self._exception = None
+
+    def increment(self):
+        with self._lock:
+            self._produced += 1
+
+    def record_exception(self, exc):
+        with self._lock:
+            if self._exception is None:
+                self._exception = exc
+
+    @property
+    def produced(self):
+        with self._lock:
+            return self._produced
+
+    @property
+    def exception(self):
+        with self._lock:
+            return self._exception
+
+
+def _async_produce(config, topic, total, results):
+    """Produce messages in a background thread; records the first delivery error."""
+    p = Producer(config)
+
+    def _cb(err, msg):
+        if err:
+            results.record_exception(KafkaException(err))
+        else:
+            results.increment()
+
+    try:
+        for i in range(total):
+            if results.exception:
+                break
+            while True:
+                try:
+                    p.produce(topic, key=f"key-{i}", value=f"reauth-msg-{i}", callback=_cb)
+                    p.poll(0)
+                    break
+                except BufferError:
+                    p.poll(0.1)
+                    if results.exception:
+                        break
+        if not results.exception:
+            p.flush(timeout=30)
+    except KafkaException as e:
+        results.record_exception(e)
+    except Exception as e:
+        results.record_exception(Exception(str(e)))
+
+
+def _remove_user_from_jaas(jaas_path, username):
+    """Remove a user entry from a JAAS config file to trigger a gateway hot-reload.
+
+    Mirrors authSwapFeature.removeUserFromClientJaasConfig(username) from the
+    Java integration test testAuthSwapWithGatewayReauthEnabled.
+    """
+    with open(jaas_path, "r") as f:
+        lines = f.readlines()
+    filtered = [l for l in lines if f"user_{username}=" not in l]
+    with open(jaas_path, "w") as f:
+        f.writelines(filtered)
+    logger.info("Removed user '%s' from JAAS config at %s", username, jaas_path)
+
+
+# ---------------------------------------------------------------------------
+# Reauth test
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(
+    not os.environ.get("REAUTH_BOOTSTRAP_SERVERS"),
+    reason="Reauth infrastructure not present (REAUTH_BOOTSTRAP_SERVERS not set); "
+           "run via --run or --single which spin up the reauth compose as test mode 4",
+)
+class TestReauth:
+    """KIP-368 re-auth: mirrors testAuthSwapWithGatewayReauthEnabled.
+
+    Requires docker-compose-librdkafka-reauth-kraft.yml which brings up:
+      - Kafka  (KRaft, SASL_PLAINTEXT)
+      - Vault  (maps user1 -> newuser/newuser-secret)
+      - Gateway (AuthSwap route, connectionMaxReauthMs=5000)
+
+    The test confirms that client<->gateway re-auth is enforced: after removing
+    user1 from the gateway's hot-reloadable JAAS file, the next reauth fails and
+    the async producer receives an authentication exception.
+    """
+
+    @pytest.mark.timeout(60)
+    def test_reauth_fails_after_credential_removal(self, reauth_producer_config, jaas_config_path):
+        topic = f"reauth-test-{int(time.time() * 1000)}"
+        total_messages = 2000  # enough messages to span the 5 s reauth window
+
+        results = _AsyncProduceResults()
+        thread = threading.Thread(
+            target=_async_produce,
+            args=(reauth_producer_config, topic, total_messages, results),
+            daemon=True,
+        )
+        thread.start()
+
+        # Wait for the producer to actually start delivering messages
+        start_wait = time.time()
+        while results.produced == 0 and time.time() - start_wait < 10:
+            time.sleep(0.05)
+
+        assert results.produced > 0, "Producer should have started before timeout"
+
+        # Approach the first reauth window (connectionMaxReauthMs=5000 on the gateway)
+        time.sleep(4)
+
+        # Remove user1 from the gateway JAAS — gateway hot-reloads, next reauth fails.
+        # Mirrors: authSwapFeature.removeUserFromClientJaasConfig("user1")
+        _remove_user_from_jaas(jaas_config_path, "user1")
+        logger.info("Removed user1 from gateway JAAS; waiting for reauth failure...")
+
+        # Allow the file watcher to pick up the change (mirrors Thread.sleep(2000))
+        time.sleep(2)
+
+        # Wait up to 15 s for the producer to hit an auth exception
+        wait_start = time.time()
+        while results.exception is None and time.time() - wait_start < 15:
+            time.sleep(0.1)
+
+        assert results.exception is not None, (
+            "Producer should have received an auth exception after reauth"
+        )
+        assert results.produced < total_messages, "Not all messages should have been produced"
+        assert results.produced > 0, "Some messages should have been produced before failure"
+
+        thread.join(timeout=5)
+        logger.info(
+            "Reauth test passed: produced=%d exception=%s",
+            results.produced,
+            results.exception,
+        )

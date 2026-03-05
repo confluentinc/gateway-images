@@ -78,3 +78,29 @@ def admin_config(base_config):
     config = dict(base_config)
     config["request.timeout.ms"] = 10000
     return config
+
+
+@pytest.fixture
+def reauth_producer_config():
+    """SASL/PLAIN producer config for the AuthSwap reauth route (reauth tests only)."""
+    return {
+        "bootstrap.servers": os.environ.get("REAUTH_BOOTSTRAP_SERVERS", "gateway:19092"),
+        "security.protocol": "SASL_PLAINTEXT",
+        "sasl.mechanism": "PLAIN",
+        "sasl.username": os.environ.get("REAUTH_SASL_USERNAME", "user1"),
+        "sasl.password": os.environ.get("REAUTH_SASL_PASSWORD", "user1-secret"),
+        "acks": "all",
+    }
+
+
+@pytest.fixture
+def jaas_config_path():
+    """Path inside this container to the gateway's mutable client-auth JAAS file.
+
+    The docker-compose-librdkafka-reauth-kraft.yml bind-mounts the host configs/
+    directory into the gateway (as /etc/gateway/config) and into this container
+    (as /mutable-configs).  Writing to this path is therefore immediately visible
+    to the gateway, which hot-reloads the file — mirroring
+    authSwapFeature.removeUserFromClientJaasConfig() in the Java integration test.
+    """
+    return os.environ.get("GATEWAY_JAAS_CONFIG_PATH", "/mutable-configs/jaas-gw-authn.conf")

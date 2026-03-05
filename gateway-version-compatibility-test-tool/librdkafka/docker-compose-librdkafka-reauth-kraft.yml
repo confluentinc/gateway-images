@@ -1,0 +1,168 @@
+services:
+  # Vault stores the credential mapping: user1 -> newuser:newuser-secret
+  # Gateway fetches this per-client via the AuthSwap secret store.
+  vault:
+    image: hashicorp/vault:1.14
+    hostname: vault
+    container_name: reauth-vault
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+      VAULT_DEV_ROOT_TOKEN_ID: "vault-root-token"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./usr/local/bin/docker-entrypoint.sh server -dev &
+        echo "Waiting for Vault to start..."
+        while ! vault status; do sleep 1; done
+        export VAULT_TOKEN="vault-root-token"
+        vault kv put secret/reauth-test user1=newuser:newuser-secret
+        echo "Vault initialised with reauth-test secrets"
+        sleep infinity
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # KRaft Kafka with two listeners:
+  #   PLAINTEXT://9091  — used for healthcheck and inter-broker
+  #   SASL_PLAINTEXT://9092 — used by gateway (AuthSwap clusterAuth)
+  #
+  # KAFKA_CONNECTIONS_MAX_REAUTH_MS exercises the gateway<->kafka reauth path.
+  kafka-server:
+    image: confluentinc/cp-server:${KAFKA_SERVER_VERSION:-8.0.0}
+    container_name: reauth-kafka
+    depends_on: []
+    volumes:
+      - ../configs:/etc/kafka/configs
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_NODE_ID: 1
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-server:9093"
+      CLUSTER_ID: "MkUtXwzBR9mJHj4b2pXGgYQ"
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9091,SASL_PLAINTEXT://0.0.0.0:9092,CONTROLLER://kafka-server:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:9091,SASL_PLAINTEXT://kafka-server:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_LISTENER_NAME_SASL__PLAINTEXT_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_OPTS: "-Djava.security.auth.login.config=/etc/kafka/configs/jaas-kafka-broker.conf"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_SUPER_USERS: "User:ANONYMOUS"
+      # Enables gateway<->kafka re-auth (KIP-368)
+      KAFKA_CONNECTIONS_MAX_REAUTH_MS: 30000
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9091 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Gateway with AuthSwap:
+  #   - Validates client credentials against jaas-gw-authn.conf (hot-reloadable)
+  #   - Fetches Kafka credentials from Vault for each authenticated client
+  #   - swapConfig.clientAuth.connectionsMaxReAuthMs=5000 forces client re-auth every 5s
+  #     (mirrors AuthSwapFeature.builder().withConnectionMaxReAuthMs(5000))
+  gateway:
+    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
+    container_name: reauth-gateway
+    depends_on:
+      kafka-server:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
+    ports:
+      - "19092:19092"
+      - "19093:19093"
+      - "9190:9190"
+    volumes:
+      - ../configs:/etc/gateway/config
+    environment:
+      GATEWAY_CONFIG: |
+        gateway:
+          name: "reauth-gateway"
+          admin:
+            endpoints:
+              metrics: true
+          secretStores:
+            - name: vault-secret-store
+              provider:
+                type: Vault
+                config:
+                  address: http://vault:8200
+                  authToken: vault-root-token
+                  path: secret/reauth-test
+                  separator: ":"
+          streamingDomains:
+            - name: reauth-domain
+              type: kafka
+              kafkaCluster:
+                name: reauth-cluster
+                nodeIdRanges:
+                  - name: default
+                    start: 0
+                    end: 4
+                bootstrapServers:
+                  - id: kafka-sasl-listener
+                    endpoint: "kafka-server:9092"
+          routes:
+            - name: reauth-route
+              endpoint: "gateway:19092"
+              brokerIdentificationStrategy:
+                type: port
+              streamingDomain:
+                name: reauth-domain
+                bootstrapServerId: kafka-sasl-listener
+              security:
+                auth: swap
+                swapConfig:
+                  clientAuth:
+                    connectionsMaxReAuthMs: 5000
+                    sasl:
+                      mechanism: PLAIN
+                      callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
+                      jaasConfig:
+                        file: /etc/gateway/config/jaas-gw-authn.conf
+                  secretStore: vault-secret-store
+                  clusterAuth:
+                    sasl:
+                      mechanism: PLAIN
+                      callbackHandlerClass: org.apache.kafka.common.security.authenticator.SaslClientCallbackHandler
+                      jaasConfig:
+                        file: /etc/gateway/config/jaas-gw-swapping.conf
+          advanced:
+            useIoUring: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9190/metrics || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Same Python client image as the existing librdkafka tests.
+  # ../configs is also mounted so the test can modify jaas-gw-authn.conf at runtime,
+  # which the gateway hot-reloads (mirrors authSwapFeature.removeUserFromClientJaasConfig).
+  librdkafka-client-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.python-client
+      args:
+        LIBRDKAFKA_VERSION: ${LIBRDKAFKA_CLIENT_VERSION:-2.13.0}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    container_name: librdkafka-client-test
+    volumes:
+      - ../configs:/mutable-configs
+    command: sleep infinity
