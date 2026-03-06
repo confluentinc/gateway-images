@@ -229,9 +229,11 @@ run_compatibility_test() {
     # Test 4: REAUTH (KIP-368 client<->gateway reauth via AuthSwap)
     echo "--- REAUTH (AuthSwap gateway:19092) ---"
 
-    # Reset the gateway JAAS config so every run starts with user1 present
+    # Reset the gateway JAAS config so every run starts with user1 present.
+    # Format mirrors AuthSwapFeature.generateJaasConfig() in the Java test:
+    # user_user2 keeps the file valid after user1 is removed.
     cat > "$PARENT_DIR/configs/jaas-gw-authn.conf" << 'EOF'
-org.apache.kafka.common.security.plain.PlainLoginModule required user_user1="user1-secret";
+org.apache.kafka.common.security.plain.PlainLoginModule required username="user1" password="user1-secret" user_user1="user1-secret" user_user2="user2-secret";
 EOF
 
     REAUTH_EXIT_CODE=0
@@ -257,6 +259,11 @@ EOF
         "
         REAUTH_EXIT_CODE=$?
         docker cp librdkafka-client-test:/junit-results/reauth/ "$JUNIT_RESULTS_DIR/" 2>/dev/null || true
+
+        # Capture gateway logs for diagnostics (especially on failure)
+        echo "--- Gateway logs (reauth run) ---"
+        docker logs reauth-gateway 2>&1 | grep -iE "(reauth|sasl|session|watcher|jaas|FileWatcher|sessionLifetime|HANDSHAKE|detected content|callback)" | tail -60 || true
+
         docker-compose -f docker-compose-librdkafka-reauth-kraft.yml down -v
     fi
     set -e

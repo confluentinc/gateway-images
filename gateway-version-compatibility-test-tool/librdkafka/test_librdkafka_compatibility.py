@@ -10,6 +10,7 @@ Does NOT cover: Kafka Streams (Java-only, not supported by librdkafka).
 
 import logging
 import os
+import re
 import threading
 import time
 import pytest
@@ -718,20 +719,24 @@ class _AsyncProduceResults:
             return self._exception
 
 
-def _async_produce(config, topic, total, results):
-    """Produce messages in a background thread; records the first delivery error."""
+def _async_produce(config, topic, stop_event, results):
+    """Produce messages continuously until stop_event is set or a delivery error occurs.
+
+    Runs indefinitely so there are always inflight messages when the re-auth window
+    expires — mirroring KafkaClientUtil.produceAsync() in the Java integration test.
+    """
     p = Producer(config)
+    i = 0
 
     def _cb(err, msg):
         if err:
             results.record_exception(KafkaException(err))
+            stop_event.set()
         else:
             results.increment()
 
     try:
-        for i in range(total):
-            if results.exception:
-                break
+        while not stop_event.is_set() and results.exception is None:
             while True:
                 try:
                     p.produce(topic, key=f"key-{i}", value=f"reauth-msg-{i}", callback=_cb)
@@ -739,27 +744,32 @@ def _async_produce(config, topic, total, results):
                     break
                 except BufferError:
                     p.poll(0.1)
-                    if results.exception:
+                    if stop_event.is_set() or results.exception:
                         break
-        if not results.exception:
-            p.flush(timeout=30)
+            i += 1
     except KafkaException as e:
         results.record_exception(e)
     except Exception as e:
         results.record_exception(Exception(str(e)))
+    finally:
+        try:
+            p.flush(timeout=5)
+        except Exception:
+            pass
 
 
 def _remove_user_from_jaas(jaas_path, username):
-    """Remove a user entry from a JAAS config file to trigger a gateway hot-reload.
+    """Remove a user_<username>="..." token from a JAAS config file to trigger a gateway hot-reload.
 
-    Mirrors authSwapFeature.removeUserFromClientJaasConfig(username) from the
-    Java integration test testAuthSwapWithGatewayReauthEnabled.
+    Mirrors authSwapFeature.removeUserFromClientJaasConfig(username) from the Java integration
+    test testAuthSwapWithGatewayReauthEnabled. The JAAS file uses a single-line multi-field
+    format, so we do token-level removal (not line filtering) to keep the file valid.
     """
     with open(jaas_path, "r") as f:
-        lines = f.readlines()
-    filtered = [l for l in lines if f"user_{username}=" not in l]
+        content = f.read()
+    content = re.sub(rf'\s+user_{re.escape(username)}="[^"]*"', "", content)
     with open(jaas_path, "w") as f:
-        f.writelines(filtered)
+        f.write(content)
     logger.info("Removed user '%s' from JAAS config at %s", username, jaas_path)
 
 
@@ -788,12 +798,12 @@ class TestReauth:
     @pytest.mark.timeout(60)
     def test_reauth_fails_after_credential_removal(self, reauth_producer_config, jaas_config_path):
         topic = f"reauth-test-{int(time.time() * 1000)}"
-        total_messages = 2000  # enough messages to span the 5 s reauth window
 
+        stop_event = threading.Event()
         results = _AsyncProduceResults()
         thread = threading.Thread(
             target=_async_produce,
-            args=(reauth_producer_config, topic, total_messages, results),
+            args=(reauth_producer_config, topic, stop_event, results),
             daemon=True,
         )
         thread.start()
@@ -804,6 +814,7 @@ class TestReauth:
             time.sleep(0.05)
 
         assert results.produced > 0, "Producer should have started before timeout"
+        produced_before_removal = results.produced
 
         # Approach the first reauth window (connectionMaxReauthMs=5000 on the gateway)
         time.sleep(4)
@@ -821,13 +832,15 @@ class TestReauth:
         while results.exception is None and time.time() - wait_start < 15:
             time.sleep(0.1)
 
+        stop_event.set()
+        thread.join(timeout=5)
+
         assert results.exception is not None, (
             "Producer should have received an auth exception after reauth"
         )
-        assert results.produced < total_messages, "Not all messages should have been produced"
-        assert results.produced > 0, "Some messages should have been produced before failure"
+        assert results.produced > produced_before_removal, \
+            "Some messages should have been produced before credential removal"
 
-        thread.join(timeout=5)
         logger.info(
             "Reauth test passed: produced=%d exception=%s",
             results.produced,

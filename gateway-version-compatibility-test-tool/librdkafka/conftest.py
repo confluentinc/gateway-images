@@ -82,7 +82,13 @@ def admin_config(base_config):
 
 @pytest.fixture
 def reauth_producer_config():
-    """SASL/PLAIN producer config for the AuthSwap reauth route (reauth tests only)."""
+    """SASL/PLAIN producer config for the AuthSwap reauth route (reauth tests only).
+
+    Mirrors the Java KafkaClientUtil.produceAsync() producer settings:
+      DELIVERY_TIMEOUT_MS=10000, RETRIES=1, RETRY_BACKOFF_MS=100.
+    Without a short message.timeout.ms, librdkafka retries for 5 minutes by default,
+    so the delivery callback never fires with the auth error within the test window.
+    """
     return {
         "bootstrap.servers": os.environ.get("REAUTH_BOOTSTRAP_SERVERS", "gateway:19092"),
         "security.protocol": "SASL_PLAINTEXT",
@@ -90,6 +96,9 @@ def reauth_producer_config():
         "sasl.username": os.environ.get("REAUTH_SASL_USERNAME", "user1"),
         "sasl.password": os.environ.get("REAUTH_SASL_PASSWORD", "user1-secret"),
         "acks": "all",
+        "message.timeout.ms": 10000,   # fail delivery after 10s (Java: DELIVERY_TIMEOUT_MS=10000)
+        "retries": 1,                   # only retry once     (Java: RETRIES=1)
+        "retry.backoff.ms": 100,        # quick retry         (Java: RETRY_BACKOFF_MS=100)
     }
 
 
