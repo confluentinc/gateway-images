@@ -286,6 +286,15 @@ class EnhancedKroxyliciousMetricsParser:
               status = "❓"
             
             f.write(f"{client_ver:<10} {server_ver:<10} {auth_mode:<12} {status:<8} {tests_run:<10} {tests_passed:<12} {tests_failed:<12}\n")
+
+          # Add REAUTH row if JUnit results exist for it (reauth runs in a separate compose)
+          if 'REAUTH' in vc_results:
+            reauth_data = vc_results['REAUTH']
+            reauth_run = reauth_data['tests_run']
+            reauth_failed = reauth_data['failures'] + reauth_data['errors']
+            reauth_passed = reauth_run - reauth_failed
+            reauth_status = "✅" if reauth_failed == 0 else "❌"
+            f.write(f"{client_ver:<10} {server_ver:<10} {'REAUTH':<12} {reauth_status:<8} {reauth_run:<10} {reauth_passed:<12} {reauth_failed:<12}\n")
         else:
           # No JUnit results available, show N/A
           f.write(f"{client_ver:<10} {server_ver:<10} {'N/A':<12} {'❓':<8} {'N/A':<10} {'N/A':<12} {'N/A':<12}\n")
@@ -558,6 +567,8 @@ class EnhancedKroxyliciousMetricsParser:
       return 'SASL'
     if 'ssl' in vc_dir:
       return 'SSL'
+    if 'reauth' in vc_dir:
+      return 'REAUTH'
     return 'PLAINTEXT'
 
   @staticmethod
