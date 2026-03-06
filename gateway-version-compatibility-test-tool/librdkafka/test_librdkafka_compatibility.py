@@ -761,8 +761,7 @@ def _async_produce(config, topic, stop_event, results):
 def _remove_user_from_jaas(jaas_path, username):
     """Remove a user_<username>="..." token from a JAAS config file to trigger a gateway hot-reload.
 
-    Mirrors authSwapFeature.removeUserFromClientJaasConfig(username) from the Java integration
-    test testAuthSwapWithGatewayReauthEnabled. The JAAS file uses a single-line multi-field
+    The JAAS file uses a single-line multi-field
     format, so we do token-level removal (not line filtering) to keep the file valid.
     """
     with open(jaas_path, "r") as f:

@@ -96,9 +96,9 @@ def reauth_producer_config():
         "sasl.username": os.environ.get("REAUTH_SASL_USERNAME", "user1"),
         "sasl.password": os.environ.get("REAUTH_SASL_PASSWORD", "user1-secret"),
         "acks": "all",
-        "message.timeout.ms": 10000,   # fail delivery after 10s (Java: DELIVERY_TIMEOUT_MS=10000)
-        "retries": 1,                   # only retry once     (Java: RETRIES=1)
-        "retry.backoff.ms": 100,        # quick retry         (Java: RETRY_BACKOFF_MS=100)
+        "message.timeout.ms": 10000,
+        "retries": 1,
+        "retry.backoff.ms": 100,
     }
 
 
