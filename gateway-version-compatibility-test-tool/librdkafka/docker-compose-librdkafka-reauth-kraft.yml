@@ -70,10 +70,9 @@ services:
       start_period: 60s
 
   # Gateway with AuthSwap:
-  #   - Validates client credentials against jaas-gw-authn.conf (hot-reloadable)
+  #   - Validates client credentials against jaas-gw-authn.conf
   #   - Fetches Kafka credentials from Vault for each authenticated client
   #   - swapConfig.clientAuth.connectionsMaxReAuthMs=5000 forces client re-auth every 5s
-  #     (mirrors AuthSwapFeature.builder().withConnectionMaxReAuthMs(5000))
   gateway:
     image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
     container_name: reauth-gateway
@@ -150,9 +149,6 @@ services:
       retries: 3
       start_period: 30s
 
-  # Same Python client image as the existing librdkafka tests.
-  # ../configs is also mounted so the test can modify jaas-gw-authn.conf at runtime,
-  # which the gateway hot-reloads (mirrors authSwapFeature.removeUserFromClientJaasConfig).
   librdkafka-client-test:
     build:
       context: .
