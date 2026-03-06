@@ -1,21 +1,43 @@
 # Python client image for librdkafka version compatibility testing
-# Installs confluent-kafka-python (which bundles librdkafka) at a specific version
+# Builds the matching librdkafka version from source when available to guarantee
+# version accuracy for source-compiled confluent-kafka-python installs.
 
 ARG LIBRDKAFKA_VERSION=2.13.0
 FROM python:3.11-slim
 
 ARG LIBRDKAFKA_VERSION
 
-# Install system dependencies required by confluent-kafka (librdkafka C extension)
+# Install build tools and dependencies for compiling librdkafka and confluent-kafka
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         gcc \
+        g++ \
+        make \
         libc6-dev \
-        librdkafka-dev \
         libssl-dev \
         libffi-dev \
+        libzstd-dev \
+        zlib1g-dev \
         curl && \
     rm -rf /var/lib/apt/lists/*
+
+# Build librdkafka from source at the matching version.
+# Some confluent-kafka-python patch releases (e.g. 2.6.2, 2.8.2) don't have
+# a matching librdkafka tag — those versions ship pre-built wheels with
+# the correct bundled librdkafka, so a source build isn't needed for them.
+RUN if curl -sfL "https://github.com/confluentinc/librdkafka/archive/refs/tags/v${LIBRDKAFKA_VERSION}.tar.gz" -o /tmp/librdkafka.tar.gz; then \
+        tar xzf /tmp/librdkafka.tar.gz -C /tmp && \
+        cd /tmp/librdkafka-${LIBRDKAFKA_VERSION} && \
+        ./configure --prefix=/usr && \
+        make -j$(nproc) && \
+        make install && \
+        cd / && \
+        rm -rf /tmp/librdkafka* && \
+        ldconfig && \
+        echo "Built librdkafka ${LIBRDKAFKA_VERSION} from source"; \
+    else \
+        echo "No librdkafka tag v${LIBRDKAFKA_VERSION}; will use wheel-bundled librdkafka"; \
+    fi
 
 # Create directories for test results
 RUN mkdir -p /junit-results /html-results /tests
@@ -26,7 +48,8 @@ COPY test_librdkafka_compatibility.py /tests/
 
 WORKDIR /tests
 
-# Install the specific version of confluent-kafka and test dependencies
+# Install confluent-kafka — pip will use a pre-built wheel (with bundled librdkafka)
+# when available, or build from source against the librdkafka we just installed.
 RUN pip install --no-cache-dir confluent-kafka==${LIBRDKAFKA_VERSION} && \
     pip install --no-cache-dir pytest pytest-html pytest-timeout
 
