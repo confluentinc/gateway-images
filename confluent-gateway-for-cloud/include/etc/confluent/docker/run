@@ -24,6 +24,10 @@ if [ -z "$GATEWAY_CONFIG_FILE" ]; then
   export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
 fi
 
+if [ -z "$GATEWAY_LOG_REDACTOR_RULES" ] && [ -f "/etc/gateway/log-redactor-rules.json" ]; then
+    export GATEWAY_LOG_REDACTOR_RULES="/etc/gateway/log-redactor-rules.json"
+fi
+
 GATEWAY_START_ARGS=()
 
 if [ -f "/etc/${COMPONENT}/licenses.txt" ]; then
