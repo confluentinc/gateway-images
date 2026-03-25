@@ -1,1 +1,3 @@
 *	@confluentinc/cpc-gateway
+.semaphore/	@confluentinc/cpc-gateway @confluentinc/cp-build-and-release-team
+service.yml	@confluentinc/cpc-gateway @confluentinc/cp-build-and-release-team
