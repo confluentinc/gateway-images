@@ -29,11 +29,11 @@ echo "Verifying secrets..."
 docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv get secret/admin-user
 docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv get secret/test_user
 
-# 4. Verify the secret was created
+# 6. Verify the secret was created
 curl -s -H "X-Vault-Token: vault-plaintext-root-token" \
   http://localhost:8200/v1/secret/data/testing
 
-# 5. Now start kafka and gateway
+# 7. Now start kafka and gateway
 docker compose up -d kafka-1
 sleep 10
 docker compose up -d gateway
