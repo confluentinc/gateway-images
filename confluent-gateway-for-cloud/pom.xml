@@ -9,7 +9,7 @@
     <artifactId>cpc-gateway-images-parent</artifactId>
     <version>1.3.0-0</version>
   </parent>
-  <artifactId>cpc-gateway</artifactId>
+  <artifactId>confluent-gateway-for-cloud</artifactId>
   <name>Gateway Docker Image</name>
   <properties>
     <docker.skip-build>false</docker.skip-build>

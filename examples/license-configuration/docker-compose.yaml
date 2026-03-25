@@ -1,0 +1,151 @@
+services:
+
+  # Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller.
+  kafka-1:
+    image: confluentinc/cp-server:latest
+    container_name: kafka-1
+    ports:
+      - "33333:33333"  # External listener port (for clients outside Docker)
+      - "44444:44444"  # Internal listener port (for internal communication)
+      - "9093:9093"    # Controller port (for controller communication)
+    volumes:
+      - ${KAFKA_SERVER_JAAS_CONF:-./kafka_server_jaas.conf}:/etc/kafka/kafka_server_jaas.conf # loading JAAS config for SASL authentication
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-1:9093'
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://0.0.0.0:33333, CONTROLLER://kafka-1:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka-1:44444,EXTERNAL://localhost:33333'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
+      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf'
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
+
+  # Below is a set of configs to bring up a gateway container that acts as a proxy for the kafka-1 broker defined above.
+  # kafka-1 is onboarded with the Gateway with streaming domain as sample-domain. Gateway connects to this sample streaming domain using internal-listener-endpoint as the bootstrap server endpoint.
+  # When passthrough authentication is enabled at Gateway, Gateway will forward the requests to the brokers and will not perform any authentication. Broker will perform authentication.
+  # Passthrough routes on Gateway are created for clients to connect to the kafka-1 brokers via the Gateway.
+
+  gateway:
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
+    container_name: gateway
+    depends_on:
+      - kafka-1
+    environment:
+      # ========================================
+      # License Configuration
+      # ========================================
+      # TRIAL MODE (Default): Comment out or remove GATEWAY_LICENSES to run with max 4 routes
+      # LICENSED MODE: Uncomment and add your license token below for unlimited routes
+      #
+      # GATEWAY_LICENSES: |
+      #   your-license-token-here
+      #   additional-license-token-if-needed
+      #
+      # Alternative: Set via environment variable before running docker compose:
+      #   export GATEWAY_LICENSES="your-license-token"
+      #   docker compose up -d
+      # ========================================
+
+      GATEWAY_CONFIG: |
+        gateway:
+          admin:
+            endpoints:
+              metrics: true
+          streamingDomains:
+            - name: sample-domain  
+              type: kafka
+              kafkaCluster:
+                name: kafka-cluster-1 
+                nodeIdRanges:
+                  - name: d
+                    start: 1 
+                    end: 5
+                bootstrapServers:
+                  - id: internal-kafka-listener  
+                    endpoint: "kafka-1:44444" 
+          routes:
+            # Route 1: Primary passthrough route (used in README examples)
+            - name: passthrough-route
+              endpoint: "localhost:19092" 
+              brokerIdentificationStrategy:
+                type: port 
+              streamingDomain:
+                name: sample-domain
+                bootstrapServerId: internal-kafka-listener 
+              security:
+                auth: passthrough
+        
+            # Route 2: Additional passthrough route
+            - name: passthrough-route-2
+              endpoint: "localhost:29092" 
+              brokerIdentificationStrategy:
+                type: port 
+              streamingDomain:
+                name: sample-domain
+                bootstrapServerId: internal-kafka-listener 
+              security:
+                auth: passthrough
+        
+            # Route 3: Additional passthrough route
+            - name: passthrough-route-3
+              endpoint: "localhost:39092" 
+              brokerIdentificationStrategy:
+                type: port 
+              streamingDomain:
+                name: sample-domain
+                bootstrapServerId: internal-kafka-listener 
+              security:
+                auth: passthrough
+        
+            # Route 4: Additional passthrough route (max for trial mode)
+            - name: passthrough-route-4
+              endpoint: "localhost:49092" 
+              brokerIdentificationStrategy:
+                type: port 
+              streamingDomain:
+                name: sample-domain
+                bootstrapServerId: internal-kafka-listener 
+              security:
+                auth: passthrough
+        
+            # Route 5: TRIAL MODE LIMIT - Uncomment to test the 4-route trial limit
+            # This 5th route will cause Gateway to fail in trial mode
+            # To use this route, you must provide a valid license via GATEWAY_LICENSES
+            # - name: passthrough-route-5
+            #   endpoint: "localhost:59092"
+            #   brokerIdentificationStrategy:
+            #     type: port
+            #   streamingDomain:
+            #     name: sample-domain
+            #     bootstrapServerId: internal-kafka-listener
+            #   security:
+            #     auth: passthrough
+
+    ports: # mapping gateway ports to the host ports. These are the ports on which the gateway will listen for requests.
+      - "19092:19092"  # passthrough-route (primary, used in examples)
+      - "29092:29092"  # passthrough-route-2
+      - "39092:39092"  # passthrough-route-3
+      - "49092:49092"  # passthrough-route-4
+      # - "59092:59092"  # passthrough-route-5 (uncomment if testing 5th route)
+      - "9190:9190"    # Gateway admin and metrics endpoint
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "

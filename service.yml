@@ -1,6 +1,6 @@
 name: gateway-images
 lang: python
-lang_version: 3.12
+lang_version: "3.12"
 git:
   enable: true
 codeowners:
@@ -9,7 +9,7 @@ semaphore:
   enable: true
   pipeline_type: cp-dockerfile
   pipeline_enable: false
-  docker_repos: ["confluentinc/cpc-gateway",]
+  docker_repos: ["confluentinc/cpc-gateway", "confluentinc/confluent-gateway-for-cloud"]
   maven_phase: 'package'
   maven_skip_deploy: true
   build_arm: true
@@ -66,10 +66,22 @@ semaphore:
         - name: KAFKA_CLIENT_VERSION
           required: false
           description: "Kafka client version to test against, e.g., 8.0.0"
+    - name: librdkafka-version-compatibility-tests
+      branch: master
+      at: "0 21 * * 1"    # Mon at 21:00 UTC
+      pipeline_file: .semaphore/librdkafka_version_compatibility_tests.yml
+      parameters:
+        - name: LIBRDKAFKA_CLIENT_VERSION
+          required: false
+          description: "confluent-kafka-python version to test, e.g., 2.6.2"
+        - name: KAFKA_SERVER_VERSION
+          required: false
+          description: "Kafka server version to test against, e.g., 8.0.0"
 code_artifact:
   enable: true
   package_paths:
     - maven-snapshots/maven/io.confluent/cpc-gateway-images
     - maven-snapshots/maven/io.confluent/cpc-gateway-images-parent
     - maven-snapshots/maven/io.confluent.cpc-gateway-images/cpc-gateway-images-parent
-    - maven-snapshots/maven/io.confluent.cpc-gateway-images/cpc-gateway
+    - maven-snapshots/maven/io.confluent.cpc-gateway-images/cpc-gateway  
+    - maven-snapshots/maven/io.confluent.cpc-gateway-images/confluent-gateway-for-cloud

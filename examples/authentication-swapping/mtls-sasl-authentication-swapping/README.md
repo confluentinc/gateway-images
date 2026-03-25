@@ -13,8 +13,8 @@ Following combinations of Authentication Swapping are supported for testing,
 
 | Client → Gateway | Gateway → Broker |
 |-----------------|------------------|
-| SASL/Plain      | SASL/Plain      |
-| SASL/Plain      | SASL/OAuthBearer|
+| mTLS      | SASL/Plain      |
+| mTLS      | SASL/OAuthBearer|
 
 Following secret stores are supported for fetching the credentials,
 
@@ -42,8 +42,8 @@ In this setup:
 
 | Step | Component | Action | Credentials/Configuration |
 |------|-----------|--------|-------------------------|
-| 1 | Client | Authenticates to Gateway | **Credentials:** `test_user`/`test_password`<br><br>Uses SASL PLAIN authentication |
-| 2 | Gateway | Authenticates incoming client | **JAAS Config (`jaas-config-for-gw-authn.conf`):**<br>```org.apache.kafka.common.security.plain.PlainLoginModule required user_test_user="test_password";``` |
+| 1 | Client | Authenticates to Gateway | **Credentials:** client certificate with CN =`test_user`<br><br>Uses mTLS authentication |
+| 2 | Gateway | Authenticates incoming client | **Extracts principal from certificate:**<br>```principalMappingRules: RULE:^CN=(.*?),OU=Engineering.*$/$1/``` |
 | 3 | Gateway | Fetches swapped credentials | **From Vault:** Looks up credentials for `test_user`<br>Gets `swapped_password` |
 | 4 | Gateway | Forwards to Kafka broker | **JAAS Template (`jaas-template-for-gw-swapping.conf`):**<br>```org.apache.kafka.common.security.plain.PlainLoginModule required username="%s" password="%s";```<br><br>Values filled in as: `test_user`/`swapped_password` . JAAS conf used by Gateway needs to be in template format so that Gateway can dynamically populate using the fetched credentials  |
 | 5 | Kafka Broker | Authenticates Gateway | **JAAS Config (`jaas-config-for-broker-authn.conf`):**<br>```KafkaServer { org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret" user_admin="admin-secret" user_test_user="swapped_password";};``` 
@@ -67,8 +67,8 @@ gateway:
       - kafka-1
       - vault
     volumes:
-      - ${GATEWAY_JAAS_CONF_FOR_GW_AUTHN}:/etc/gateway/config/jaas-config-for-gw-authn.conf # loading JAAS config for SASL authentication at Gateway
       - ${GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING}:/etc/gateway/config/jaas-template-for-gw-swapping.conf # loading JAAS template for SASL authentication at Gateway
+      - ./ssl:/etc/gateway/ssl # Certificates to be configured on Gateway.
     environment:
       GATEWAY_CONFIG: | 
         gateway:
@@ -107,13 +107,20 @@ gateway:
                 bootstrapServerId: internal-kafka-listener 
               security:
                 auth: swap 
+                ssl:
+                  truststore:
+                    location: /etc/gateway/ssl/truststore.jks
+                    password:
+                      file: /etc/gateway/ssl/password.txt 
+                  keystore:
+                    location: /etc/gateway/ssl/server-keystore.jks
+                    password:
+                      file: /etc/gateway/ssl/password.txt 
+                  clientAuth: requested
                 swapConfig:
                   clientAuth:
-                    sasl:
-                      mechanism: PLAIN
-                      callbackHandlerClass: org.apache.kafka.common.security.plain.internals.PlainServerCallbackHandler
-                      jaasConfig:
-                        file: /etc/gateway/config/jaas-config-for-gw-authn.conf
+                    ssl:
+                      principalMappingRules: RULE:^CN=(.*?),OU=Engineering.*$/$1/
                   secretStore: vault-secret-store
                   clusterAuth:
                     sasl:
@@ -132,7 +139,6 @@ The following environment variables are set in `start.sh`:
 
 - `GATEWAY_IMAGE`: Confluent Platform Gateway image
 - `KAFKA_SERVER_JAAS_CONF`: Path to broker JAAS configuration
-- `GATEWAY_JAAS_CONF_FOR_GW_AUTHN`: Path to Gateway authentication JAAS config
 - `GATEWAY_JAAS_TEMPLATE_FOR_GW_SWAPPING`: Path to Gateway swapping JAAS template
 
 
@@ -166,11 +172,12 @@ You can download the Kafka consoleclients [here](https://kafka.apache.org/downlo
 Create a client config file "auth_swap_client.properties" with the following details and make them accessible for the console clients. Since this is authentication swapping experience, in the client property files, we need to provide credentials expected by the Gateway wrt the client.
 
 ```
-security.protocol=SASL_PLAINTEXT
-sasl.mechanism=PLAIN
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
-username="test_user" \
-password="test_password";
+security.protocol=SSL
+ssl.truststore.location=ssl/truststore.jks
+ssl.keystore.password=password
+ssl.keystore.location=ssl/client-keystore.jks
+ssl.truststore.password=password
+request.timeout.ms=3000
 ```
 
 Since the Auth-Swap Route is available at Gateway's localhost:19092, we need the clients to connect to localhost:19092 to stream data. 
@@ -180,7 +187,7 @@ Since the Auth-Swap route is configured with Authentication Swapping, all the cl
 
 **Create a topic via the Gateway** 
 ```
- ./kafka-topics --bootstrap-server localhost:19092 --create --topic "test-topic" --command-config auth_swap_client.properties
+ ./kafka-topics --bootstrap-server localhost:19092 --create --topic "test-topic" --command-config mtls_auth_swap_client.properties
 ```
 
 **Run the producer**
@@ -188,12 +195,12 @@ Since the Auth-Swap route is configured with Authentication Swapping, all the cl
 while true; do                                                                                                              
   echo "Test message at $(date '+%H:%M:%S')"
   sleep 2
-done | ./kafka-console-producer --bootstrap-server localhost:19092 --topic test-topic --producer.config auth_swap_client.properties
+done | ./kafka-console-producer --bootstrap-server localhost:19092 --topic test-topic --producer.config mtls_auth_swap_client.properties
 ```
 
 **Run the consumer**
 ``` 
-./kafka-console-consumer --bootstrap-server localhost:19092 --topic test-topic --consumer.config auth_swap_client.properties
+./kafka-console-consumer --bootstrap-server localhost:19092 --topic test-topic --consumer.config mtls_auth_swap_client.properties
 ```
 
 ### Cleanup
