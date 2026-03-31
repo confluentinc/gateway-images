@@ -35,7 +35,7 @@ global_job_config:
       - pip install confluent-devtools
       - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/"
       - export LATEST_PACKAGING_BUILD_NUMBER=latest # use packages in latest directory of corresponding nightly branch
-      - export GATEWAY_VERSION="1.1.2" #hardcoded for now
+      - export GATEWAY_VERSION="1.2.0" #hardcoded for now
       - export DEFAULT_OS_TYPE="ubi"
       - export PACKAGES_URL="https://s3-us-west-2.amazonaws.com/dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/$LATEST_PACKAGING_BUILD_NUMBER/PACKAGE_TYPE"
       - export PACKAGING_BUILD_NUMBER=$LATEST_PACKAGING_BUILD_NUMBER
@@ -91,7 +91,7 @@ blocks:
             - export OS_TAG="-ubi9"
             - export DOCKER_DEV_FULL_IMAGES=$DOCKER_DEV_REGISTRY${DOCKER_REPOS// /:$DOCKER_DEV_TAG$OS_TAG $DOCKER_DEV_REGISTRY}:$DOCKER_DEV_TAG$OS_TAG
             - export AMD_DOCKER_DEV_FULL_IMAGES=${DOCKER_DEV_FULL_IMAGES// /$AMD_ARCH }$AMD_ARCH
-            - ci-tools ci-update-version
+            - ci-tools ci-update-version --direct-pom-edit
             - export OS_PACKAGES_URL=$(echo "$PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
             - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
@@ -126,7 +126,7 @@ blocks:
             - export ARM_DOCKER_DEV_FULL_IMAGES=${DOCKER_DEV_FULL_IMAGES// /$ARM_ARCH }$ARM_ARCH
             - export OS_PACKAGES_URL=$(echo "$PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
-            - ci-tools ci-update-version
+            - ci-tools ci-update-version --direct-pom-edit
             - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
               -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$ARM_ARCH -Darch.type=$ARM_ARCH -Ddocker.os_type=ubi9
               $PACKAGING_BUILD_ARGS -Ddependency.check.skip=true $MAVEN_EXTRA_ARGS
@@ -153,7 +153,6 @@ after_pipeline:
       - name: SonarQube
         commands:
           - checkout
-          - sem-version java 17
           - artifact pull workflow target-AMD
           - artifact pull workflow target-ARM
-          - emit-sonarqube-data --enable_sonarqube_enterprise --run_only_sonar_scan
+          - emit-sonarqube-data --run_only_sonar_scan

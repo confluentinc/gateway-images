@@ -1,0 +1,5 @@
+{
+  "ignorePaths": [
+    "gateway-version-compatibility-test-tool/**"
+  ]
+}

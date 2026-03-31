@@ -7,8 +7,6 @@ This example demonstrates how to configure CPC Gateway to act as a passthrough p
 In this configuration:
 - **Gateway** acts as a passthrough proxy - it forwards authentication requests to Confluent Cloud without performing authentication itself
 - **Confluent Cloud** performs the actual authentication using your API credentials
-- **SSL/TLS** certificates are downloaded from Confluent Cloud and configured in the Gateway's streaming domain
-
 
 When clients connect:
 1. Client connects to Gateway at `localhost:19092` using `SASL_PLAINTEXT`
@@ -19,54 +17,11 @@ When clients connect:
 
 ## Setup Instructions
 
-### Step 1: Download SSL Certificates from Confluent Cloud
+### Step 1: Update Gateway Configuration
 
-The Gateway needs to trust the SSL certificates from your Confluent Cloud cluster. Use the provided script to download and create a truststore:
+Edit `gateway.yaml` and update **Bootstrap server endpoint** - Replace with your Confluent Cloud cluster endpoint
 
-```bash
-chmod +x ./download-cc-certs.sh
-./download-cc-certs.sh <your-cc-bootstrap-server>
-```
-
-**Example:**
-```bash
-./download-cc-certs.sh pkc-xxxxx.us-west2.gcp.confluent.cloud:9092
-```
-
-This script will:
-1. ✅ Download the certificate chain from your Confluent Cloud cluster
-2. ✅ Create certificates in `ssl/<your-cc-domain>/` directory
-3. ✅ Create a PKCS12 truststore at `ssl/<your-cc-domain>/truststore.p12`
-4. ✅ Create a password file at `ssl/<your-cc-domain>/truststore.password`
-5. ✅ Verify the truststore was created successfully
-
-**Certificate Storage:**
-
-The script creates a domain-specific directory based on your Confluent Cloud cluster:
-```
-ssl/
-  └── pkc-xxxxx.us-west2.gcp.confluent.cloud/
-      ├── truststore.p12
-      └── truststore.password
-```
-
-This directory structure is mounted to `/etc/gateway/ssl/` in the Gateway container via `docker-compose.yaml`, making the certificates available at:
-- `/etc/gateway/ssl/pkc-xxxxx.us-west2.gcp.confluent.cloud/truststore.p12`
-- `/etc/gateway/ssl/pkc-xxxxx.us-west2.gcp.confluent.cloud/truststore.password`
-
-The certificates are configured in the Gateway's `streamingDomains` section under `ssl.truststore`.
-
-### Step 2: Update Gateway Configuration
-
-Edit `gateway.yaml` and update two things:
-
-1. **Bootstrap server endpoint** - Replace with your Confluent Cloud cluster endpoint
-2. **SSL certificate paths** - Update the paths to match the directory created by the download script
-
-
-**Note:** The paths in `gateway.yaml` reference `/etc/gateway/ssl/<your-cc-domain>/` because the `docker-compose.yaml` mounts `./ssl` to `/etc/gateway/ssl` in the container.
-
-### Step 3: Update Client Configuration
+### Step 2: Update Client Configuration
 
 Edit `client.properties` and add your Confluent Cloud API credentials:
 
@@ -84,7 +39,7 @@ sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule require
 3. Go to "API Keys" section
 4. Create a new API key or use an existing one
 
-### Step 4: Start the Gateway
+### Step 3: Start the Gateway
 
 Make the startup script executable and run it:
 
