@@ -149,7 +149,7 @@
         -->
 
         <!-- Base Image Versions -->
-        <ubi9-minimal.image.version>9.7-1773939694</ubi9-minimal.image.version>
+        <ubi9-minimal.image.version>9.7-1775623882</ubi9-minimal.image.version>
 
         <!-- OS Package Versions -->
         <ubi9-minimal.temurin-21-jdk.version>21.0.10.0.0.7-0</ubi9-minimal.temurin-21-jdk.version>
@@ -158,7 +158,7 @@
         <git-repo.cp-docker-utils.tag>v1.0.9</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.26.1-trixie</golang.image.version>
+        <golang.image.version>1.26.2-trixie</golang.image.version>
 
     </properties>
 </project>
