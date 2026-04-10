@@ -11,8 +11,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ARG APP_UID=1000
+ARG APP_GID=1000
+
 ARG GOLANG_VERSION
-ARG UBI_MINIMAL_VERSION
+ARG UBI9_VERSION
+ARG UBI_MICRO_VERSION
+
+# Stage 1: Build ub utility binary
 FROM docker.io/golang:${GOLANG_VERSION} AS build-utilities
 
 ARG CP_DOCKER_UTILS_VERSION
@@ -21,16 +27,70 @@ ENV GO_BIN="/go/bin"
 RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/ub@${CP_DOCKER_UTILS_VERSION}
 
 
-FROM registry.access.redhat.com/ubi9-minimal:${UBI_MINIMAL_VERSION}
+# Stage 2: Install packages to /microdir using full ubi9 with dnf
+FROM registry.access.redhat.com/ubi9:${UBI9_VERSION} AS builder
 
+ARG APP_UID
+ARG APP_GID
+ARG TEMURIN_JDK_VERSION
+ARG GATEWAY_VERSION
+ARG CONFLUENT_PACKAGES_REPO
+ARG PROCPS_VERSION
+ARG FINDUTILS_VERSION
+ARG HOSTNAME_VERSION
+ARG SHADOW_UTILS_VERSION
+
+RUN printf "[temurin-jre] \n\
+name=temurin-jre \n\
+baseurl=https://adoptium.jfrog.io/artifactory/rpm/rhel/\$releasever/\$basearch \n\
+enabled=1 \n\
+gpgcheck=1 \n\
+gpgkey=https://adoptium.jfrog.io/artifactory/api/gpg/key/public \n\
+" > /etc/yum.repos.d/adoptium.repo \
+    && rpm --import ${CONFLUENT_PACKAGES_REPO}/archive.key \
+    && printf "[Confluent] \n\
+name=Confluent repository \n\
+baseurl=${CONFLUENT_PACKAGES_REPO}/ \n\
+gpgcheck=1 \n\
+gpgkey=${CONFLUENT_PACKAGES_REPO}/archive.key \n\
+enabled=1 " > /etc/yum.repos.d/confluent.repo \
+    && mkdir -p /microdir
+
+RUN echo "===> Installing Temurin JRE and Gateway..." \
+    && dnf install -y --installroot=/microdir --releasever=9 --setopt=install_weak_deps=False --nodocs \
+       temurin-21-jre${TEMURIN_JDK_VERSION} \
+       confluent-gateway-${GATEWAY_VERSION} \
+       shadow-utils${SHADOW_UTILS_VERSION} \
+       coreutils \
+       procps-ng${PROCPS_VERSION} \
+       findutils${FINDUTILS_VERSION} \
+       hostname${HOSTNAME_VERSION} \
+    && echo "===> Cleaning up ..." \
+    && dnf --installroot=/microdir clean all \
+    && rm -rf /microdir/var/cache/* /microdir/var/log/dnf* /microdir/var/log/yum.* \
+    && rm /etc/yum.repos.d/adoptium.repo /etc/yum.repos.d/confluent.repo \
+    && rm -rf /microdir/lib/systemd \
+    && rm -rf /microdir/dev/* /microdir/proc/* /microdir/sys/*
+
+RUN echo "===> Creating appuser..." \
+    && chroot /microdir groupadd -g ${APP_GID} appuser \
+    && chroot /microdir useradd -u ${APP_UID} -g ${APP_GID} --no-log-init --create-home --shell /bin/bash appuser
+
+
+# Stage 3: Final image using ubi9-micro
+FROM registry.access.redhat.com/ubi9-micro:${UBI_MICRO_VERSION}
+
+ARG APP_UID
+ARG APP_GID
 ARG PROJECT_VERSION
 ARG ARTIFACT_ID
 ARG GIT_COMMIT
 ARG BUILD_NUMBER=-1
-ARG TEMURIN_JDK_VERSION
 ARG GATEWAY_VERSION
-ARG CONFLUENT_PACKAGES_REPO
 ARG CONFLUENT_PLATFORM_LABEL
+
+ENV APP_UID=${APP_UID}
+ENV APP_GID=${APP_GID}
 
 LABEL maintainer="partner-support@confluent.io"
 LABEL vendor="Confluent"
@@ -48,63 +108,33 @@ ENV LANG="C.UTF-8"
 ENV COMPONENT=gateway
 ENV COMPONENT_CONFIG_DIR=/etc/confluent-${COMPONENT}
 
-USER root
-
-RUN printf "[temurin-jre] \n\
-name=temurin-jre \n\
-baseurl=https://adoptium.jfrog.io/artifactory/rpm/rhel/\$releasever/\$basearch \n\
-enabled=1 \n\
-gpgcheck=1 \n\
-gpgkey=https://adoptium.jfrog.io/artifactory/api/gpg/key/public \n\
-" > /etc/yum.repos.d/adoptium.repo \
-    && echo "===> Installing Temurin JRE..." \
-    && microdnf install -y temurin-21-jre${TEMURIN_JDK_VERSION} \
-    && microdnf clean all \
-    && echo "===> Creating appuser and directories..." \
-    && useradd --no-log-init --create-home --shell /bin/bash appuser \
-    && mkdir -p /etc/confluent/docker /usr/logs \
-    && chown appuser:appuser -R /etc/confluent/ /usr/logs \
-    && mkdir /licenses \
-    && rm /etc/yum.repos.d/adoptium.repo
-
 COPY --from=build-utilities /go/bin/ub /usr/bin/ub
+COPY --from=builder /microdir/ /
 
+RUN mkdir -p /etc/confluent/docker /usr/logs /licenses \
+    && chown ${APP_UID}:${APP_GID} -R /etc/confluent/ /usr/logs
 
-RUN echo "===> Installing ${COMPONENT}..." \
-    && rpm --import ${CONFLUENT_PACKAGES_REPO}/archive.key \
-    && printf "[Confluent] \n\
-name=Confluent repository \n\
-baseurl=${CONFLUENT_PACKAGES_REPO}/ \n\
-gpgcheck=1 \n\
-gpgkey=${CONFLUENT_PACKAGES_REPO}/archive.key \n\
-enabled=1 " > /etc/yum.repos.d/confluent.repo \
-    && microdnf install -y confluent-${COMPONENT}-${GATEWAY_VERSION} \
-    && echo "===> Cleaning up ..." \
-    && microdnf clean all \
-    && rm -rf /tmp/* /etc/yum.repos.d/confluent.repo \
-    && echo "===> Setting up ${COMPONENT} dirs" \
-    && mkdir -p /var/lib/${COMPONENT}/data /etc/${COMPONENT}/secrets /usr/logs \
-    && chown appuser:root -R /var/lib/${COMPONENT} /etc/${COMPONENT} /etc/${COMPONENT}/secrets /usr/logs \
-    && chmod -R ug+w /var/lib/${COMPONENT} /etc/${COMPONENT} /etc/${COMPONENT}/secrets /usr/logs
-
-
-VOLUME ["/var/lib/${COMPONENT}/data", "/etc/${COMPONENT}/secrets"]
-
-# Copy files from target package to cp-base-new directory for backward compatibility (some paths are hardcoded in CFK startups scripts)
-COPY --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/doc/* /usr/share/doc/cp-base-new/
-COPY --chown=appuser:appuser target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/java/${ARTIFACT_ID}/* /usr/share/java/cp-base-new/
+# Copy files from target package to cp-base-new directory for backward compatibility (some paths are hardcoded in CFK startup scripts)
+COPY --chown=${APP_UID}:${APP_GID} target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/doc/* /usr/share/doc/cp-base-new/
+COPY --chown=${APP_UID}:${APP_GID} target/${ARTIFACT_ID}-${PROJECT_VERSION}-package/share/java/${ARTIFACT_ID}/* /usr/share/java/cp-base-new/
 
 # /usr/share/java/cp-base-java is the default java classpath for ub
 # jars in cp-base-new and cp-base-java are identical, so create a symlink to avoid duplicating files
 RUN ln -s /usr/share/java/cp-base-new /usr/share/java/cp-base-java
 
-
-COPY --chown=appuser:appuser include/etc/confluent/docker /etc/confluent/docker
+COPY --chown=${APP_UID}:${APP_GID} include/etc/confluent/docker /etc/confluent/docker
 COPY license.txt /licenses/
 
 RUN chmod +x /etc/confluent/docker/run
 RUN chmod +x /etc/confluent/docker/configure
 
-USER appuser
+RUN echo "===> Setting up ${COMPONENT} dirs" \
+    && mkdir -p /var/lib/${COMPONENT}/data /etc/${COMPONENT}/secrets /usr/logs \
+    && chown ${APP_UID}:root -R /var/lib/${COMPONENT} /etc/${COMPONENT} /etc/${COMPONENT}/secrets /usr/logs \
+    && chmod -R ug+w /var/lib/${COMPONENT} /etc/${COMPONENT} /etc/${COMPONENT}/secrets /usr/logs
+
+VOLUME ["/var/lib/${COMPONENT}/data", "/etc/${COMPONENT}/secrets"]
+
+USER ${APP_UID}
 
 CMD ["/etc/confluent/docker/run"]
