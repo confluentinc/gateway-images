@@ -1,0 +1,37 @@
+gateway:
+  name: governance-demo
+
+  admin:
+    endpoints:
+      metrics: true
+
+  schemaValidation:
+    schemaRegistryUrls:
+      - "http://schema-registry:8081"
+    keyValidationLevel: NONE
+    valueValidationLevel: ID
+    valueSubjectNameStrategy: TOPIC
+
+  streamingDomains:
+    - name: local-kafka
+      type: kafka
+      kafkaCluster:
+        name: kafka-cluster
+        nodeIdRanges:
+          - name: brokers
+            start: 1
+            end: 5
+        bootstrapServers:
+          - id: internal
+            endpoint: "kafka:29092"
+
+  routes:
+    - name: governance-route
+      endpoint: "gateway:6969"
+      brokerIdentificationStrategy:
+        type: port
+      streamingDomain:
+        name: local-kafka
+        bootstrapServerId: internal
+      security:
+        auth: passthrough
