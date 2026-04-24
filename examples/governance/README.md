@@ -1,6 +1,6 @@
 # CPC Gateway — Schema Usage Enforcement
 
-This example demonstrates **schema usage enforcement** with CPC Gateway. The Gateway validates that all records produced to Kafka use a schema registered in Confluent Schema Registry. Records without a valid schema ID are rejected before reaching the broker.
+This example demonstrates **schema ID enforcement** with CPC Gateway. The Gateway validates that all records produced to Kafka use a schema registered in Confluent Schema Registry. Records without a valid schema ID are rejected before reaching the broker.
 
 Platform operators configure enforcement once at the Gateway — all producer traffic is validated automatically with zero client changes.
 
@@ -49,7 +49,7 @@ docker compose up -d
 This starts three containers:
 - `kafka` — Confluent Server (KRaft mode, single node)
 - `schema-registry` — Confluent Schema Registry
-- `gateway` — CPC Gateway with schema usage enforcement enabled
+- `gateway` — CPC Gateway with schema ID enforcement enabled
 
 ### 3. Register a schema
 
