@@ -52,11 +52,9 @@ gpgkey=${CONFLUENT_PACKAGES_REPO}/archive.key \n\
 enabled=1 " > /etc/yum.repos.d/confluent.repo \
     && mkdir -p /microdir
 
-RUN echo "===> Installing Temurin JRE..." \
+RUN echo "===> Installing Temurin JRE and Gateway..." \
     && dnf install -y --installroot=/microdir --releasever=9 --setopt=install_weak_deps=False --nodocs \
        "temurin-21-jre${TEMURIN_JDK_VERSION}" \
-    && echo "===> Installing Gateway..." \
-    && dnf install -y --installroot=/microdir --releasever=9 --setopt=install_weak_deps=False --nodocs \
        "confluent-gateway-${GATEWAY_VERSION}" \
        shadow-utils \
        coreutils \
