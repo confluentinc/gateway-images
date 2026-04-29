@@ -30,7 +30,7 @@
     <packaging>pom</packaging>
     <name>Gateway Docker Images</name>
     <description>Build files for Confluent's Gateway Docker Images</description>
-    <version>1.3.0-0</version>
+    <version>1.4.0-0</version>
 
     <modules>
         <module>gateway</module>
@@ -116,7 +116,7 @@
 
     <properties>
         <component.name>gateway</component.name>
-        <io.confluent.gateway-images.version>1.3.0-0</io.confluent.gateway-images.version>
+        <io.confluent.gateway-images.version>1.4.0-0</io.confluent.gateway-images.version>
         <arch.type>.arm64</arch.type>
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
@@ -164,7 +164,7 @@
         <ubi9.temurin-21-jdk.version>21.0.10.0.0.7-0</ubi9.temurin-21-jdk.version>
 
         <!-- GitHub Repository Tags -->
-        <git-repo.cp-docker-utils.tag>v1.0.9</git-repo.cp-docker-utils.tag>
+        <git-repo.cp-docker-utils.tag>v1.0.10</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
         <golang.image.version>1.26.2-trixie</golang.image.version>
