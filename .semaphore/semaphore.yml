@@ -47,7 +47,14 @@ global_job_config:
         else
             export PLATFORM_LABEL=""
         fi
-      - export PACKAGING_BUILD_ARGS=" -DGATEWAY_VERSION=$GATEWAY_VERSION  -DCONFLUENT_PLATFORM_LABEL=$PLATFORM_LABEL -DALLOW_UNSIGNED=$ALLOW_UNSIGNED"
+      - |
+        # Guard each -D flag: passing an empty value (e.g. -DALLOW_UNSIGNED=) on the
+        # command line overrides the default defined in the docker-fabric8 Maven profile,
+        # causing fabric8 to receive a null build arg and fail the Docker build.
+        export PACKAGING_BUILD_ARGS=""
+        if [[ -n "$GATEWAY_VERSION" ]]; then PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DGATEWAY_VERSION=$GATEWAY_VERSION"; fi
+        if [[ -n "$PLATFORM_LABEL" ]]; then PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PLATFORM_LABEL=$PLATFORM_LABEL"; fi
+        if [[ -n "$ALLOW_UNSIGNED" ]]; then PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DALLOW_UNSIGNED=$ALLOW_UNSIGNED"; fi
       - >-
         if [[ $IS_RELEASE && $PACKAGING_BUILD_NUMBER ]]; then
           if [[ $IS_RC ]]; then
