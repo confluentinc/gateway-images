@@ -93,6 +93,36 @@ printf '\x00\x00\x00\x03\xe7hello' | kcat -b localhost:6969 -t orders -P \
 
 This sends a record with schema ID 999 (unregistered). Gateway rejects it — the schema ID is not found in Schema Registry.
 
+#### Non-Confluent client — plain JSON without wire format (rejected)
+
+Gateway enforcement is byte-level, not library-level. A client that doesn't use the Confluent serializer can still be rejected if it omits the wire-format prefix:
+
+```bash
+printf '{"order_id":"ORD-999","product":"plain-json","quantity":1,"price":1.0}' \
+  | kcat -b localhost:6969 -t orders -P \
+    -X security.protocol=SASL_PLAINTEXT \
+    -X sasl.mechanism=PLAIN \
+    -X sasl.username=admin \
+    -X sasl.password=admin-secret
+```
+
+Gateway rejects: the first byte is not `0x00`, so there is no schema ID to validate.
+
+#### Non-Confluent client — wire format with a valid schema ID (accepted)
+
+Any client that emits the Confluent wire format (`0x00` magic byte + 4-byte schema ID) with a registered ID is accepted — no Confluent serializer required:
+
+```bash
+printf '\x00\x00\x00\x00\x01bogus-payload-not-real-avro' \
+  | kcat -b localhost:6969 -t orders -P \
+    -X security.protocol=SASL_PLAINTEXT \
+    -X sasl.mechanism=PLAIN \
+    -X sasl.username=admin \
+    -X sasl.password=admin-secret
+```
+
+Gateway accepts: schema ID 1 is registered. Note that `valueValidationLevel: ID` validates the schema ID exists in Schema Registry — it does not validate that the payload bytes conform to the schema.
+
 #### Verify — consume to see only the valid record
 
 ```bash
