@@ -1,0 +1,80 @@
+services:
+
+  kafka:
+    image: confluentinc/cp-server:7.9.0
+    container_name: kafka
+    networks:
+      - gateway-network
+    ports:
+      - "9092:9092"
+    volumes:
+      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9093'
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,CONTROLLER:PLAINTEXT'
+      KAFKA_LISTENERS: 'INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://kafka:9093'
+      KAFKA_ADVERTISED_LISTENERS: 'INTERNAL://kafka:29092,EXTERNAL://localhost:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_SASL_ENABLED_MECHANISMS: 'PLAIN'
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: 'PLAIN'
+      KAFKA_OPTS: '-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_COMMAND_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_METRICS_REPORTER_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_LICENSE: ${CONFLUENT_LICENSE:?Set CONFLUENT_LICENSE env var with a valid Enterprise license JWT}
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.9.0
+    container_name: schema-registry
+    networks:
+      - gateway-network
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'SASL_PLAINTEXT://kafka:29092'
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: 'PLAIN'
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="admin" password="admin-secret";'
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: 'SASL_PLAINTEXT'
+      SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID: 'schema-registry'
+      SCHEMA_REGISTRY_CONFLUENT_LICENSE: ${CONFLUENT_LICENSE:?Set CONFLUENT_LICENSE env var with a valid Enterprise license JWT}
+
+  gateway:
+    image: 519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/confluentinc/cpc-gateway:master-latest-ubi9
+    container_name: gateway
+    networks:
+      - gateway-network
+    depends_on:
+      - kafka
+      - schema-registry
+    volumes:
+      - ./gateway.yaml:/etc/gateway/config.yaml
+    environment:
+      GATEWAY_CONFIG_FILE: /etc/gateway/config.yaml
+    ports:
+      - "6969:6969"
+      - "6970:6970"
+      - "6971:6971"
+      - "9190:9190"
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "
+
+networks:
+  gateway-network:
+    driver: bridge
