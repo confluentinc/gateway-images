@@ -11,6 +11,9 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID
     valueSubjectNameStrategy: TOPIC
+    topics:
+      - name: orders
+        valueValidationLevel: SCHEMA
 
   streamingDomains:
     - name: local-kafka

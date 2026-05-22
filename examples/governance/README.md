@@ -108,9 +108,9 @@ printf '{"order_id":"ORD-999","product":"plain-json","quantity":1,"price":1.0}' 
 
 Gateway rejects: the first byte is not `0x00`, so there is no schema ID to validate.
 
-#### Non-Confluent client — wire format with a valid schema ID (accepted)
+#### Non-Confluent client — wire format with a valid schema ID but bogus payload (rejected)
 
-Any client that emits the Confluent wire format (`0x00` magic byte + 4-byte schema ID) with a registered ID is accepted — no Confluent serializer required:
+The `orders` topic is configured with `valueValidationLevel: SCHEMA` (see Gateway Configuration below), so the gateway deserializes each record against the registered schema. A non-Confluent client can fake the wire format prefix with a registered schema ID, but if the payload bytes don't decode as valid Avro for that schema the record is rejected:
 
 ```bash
 printf '\x00\x00\x00\x00\x01bogus-payload-not-real-avro' \
@@ -121,7 +121,7 @@ printf '\x00\x00\x00\x00\x01bogus-payload-not-real-avro' \
     -X sasl.password=admin-secret
 ```
 
-Gateway accepts: schema ID 1 is registered. Note that `valueValidationLevel: ID` validates the schema ID exists in Schema Registry — it does not validate that the payload bytes conform to the schema.
+Gateway rejects: `KafkaAvroDeserializer` fails to decode the payload against the `Order` schema. Under `valueValidationLevel: ID` this same record would have been accepted — `SCHEMA` mode adds payload validation on top of the schema ID check.
 
 #### Verify — consume to see only the valid record
 
@@ -146,15 +146,28 @@ gateway:
     schemaRegistryUrls:
       - "http://schema-registry:8081"
     keyValidationLevel: NONE
-    valueValidationLevel: ID
+    valueValidationLevel: ID            # default for all topics
     valueSubjectNameStrategy: TOPIC
+    topics:
+      - name: orders
+        valueValidationLevel: SCHEMA    # stricter for orders only
 ```
 
 | Setting | Value | Description |
 |---|---|---|
-| `valueValidationLevel` | `ID` | Validate that the schema ID in each record is registered in Schema Registry |
+| `valueValidationLevel` (default) | `ID` | Validate that the schema ID in each record is registered in Schema Registry |
+| `valueValidationLevel` (orders) | `SCHEMA` | `ID` + deserialize the payload against the schema |
 | `keyValidationLevel` | `NONE` | No validation on record keys |
 | `valueSubjectNameStrategy` | `TOPIC` | Schema subject is `{topic}-value` |
+
+### Validation levels
+
+| Level | What it checks |
+|---|---|
+| `NONE` | Nothing |
+| `ID` | Schema ID exists in Schema Registry under the correct subject |
+| `SCHEMA` | `ID` + payload deserializes against the schema |
+| `DATA_CONTRACT` | `SCHEMA` + Schema Registry rules (encryption, data quality) executed |
 
 ## Cleanup
 
