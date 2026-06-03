@@ -25,6 +25,7 @@ ARG CP_DOCKER_UTILS_VERSION
 
 ENV GO_BIN="/go/bin"
 RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/ub@${CP_DOCKER_UTILS_VERSION}
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/package_dedupe@${CP_DOCKER_UTILS_VERSION}
 
 
 # Stage 2: Install packages to /microdir using full ubi9 with dnf
@@ -52,12 +53,16 @@ gpgkey=${CONFLUENT_PACKAGES_REPO}/archive.key \n\
 enabled=1 " > /etc/yum.repos.d/confluent.repo \
     && mkdir -p /microdir
 
+COPY --from=build-utilities /go/bin/package_dedupe /usr/local/bin/package_dedupe
+
 RUN echo "===> Installing Temurin JRE and Gateway..." \
     && dnf install -y --installroot=/microdir --releasever=9 --setopt=install_weak_deps=False --nodocs \
        "temurin-21-jre${TEMURIN_JDK_VERSION}" \
        "confluent-gateway-${GATEWAY_VERSION}" \
        shadow-utils \
        coreutils \
+    && echo "===> Deduping jars in /microdir ..." \
+    && package_dedupe /microdir/usr/share/java \
     && echo "===> Cleaning up ..." \
     && dnf --installroot=/microdir clean all \
     && rm -rf /microdir/var/cache/* /microdir/var/log/dnf* /microdir/var/log/yum.* /microdir/tmp/* \
