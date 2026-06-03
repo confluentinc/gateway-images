@@ -77,6 +77,32 @@ semaphore:
         - name: KAFKA_SERVER_VERSION
           required: false
           description: "Kafka server version to test against, e.g., 8.0.0"
+    # TEMP: manually-triggered task to run version compat against a specific
+    # dev gateway image (e.g. the ubi9-micro migration build). Not scheduled.
+    - name: version-compatibility-tests-tmp
+      branch: micro-migration-ubi9-compat-test
+      pipeline_file: .semaphore/version_compatibility_tests.yml
+      parameters:
+        - name: KAFKA_SERVER_VERSION
+          required: false
+          default_value: '8.0.0'
+          description: "Kafka server version to test against, e.g., 8.0.0"
+        - name: KAFKA_CLIENT_VERSION
+          required: false
+          default_value: '8.0.0'
+          description: "Kafka client version to test against, e.g., 8.0.0"
+        - name: DOCKER_REGISTRY
+          required: false
+          default_value: '519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/'
+          description: "Registry prefix (keep trailing slash) for the gateway image under test"
+        - name: GATEWAY_IMAGE_TAG
+          required: false
+          default_value: 'latest'
+          description: "Gateway image tag to test, e.g., dev-1.3.x-ffd1aeb3-ubi9.amd64"
+        - name: GATEWAY_VERSION
+          required: false
+          default_value: '1.3.0'
+          description: "Label for the S3 results path (e.g., 1.3.0)"
 code_artifact:
   enable: true
   package_paths:
