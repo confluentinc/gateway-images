@@ -22,7 +22,7 @@
     <parent>
         <groupId>io.confluent</groupId>
         <artifactId>common</artifactId>
-        <version>[8.0.4-0, 8.0.5-0)</version>
+        <version>[8.2.2-0, 8.2.3-0)</version>
     </parent>
 
     <groupId>io.confluent.gateway-images</groupId>
@@ -76,16 +76,12 @@
             <plugin>
                 <groupId>com.spotify</groupId>
                 <artifactId>dockerfile-maven-plugin</artifactId>
-                <configuration>
-                    <buildArgs>
-                        <UBI_MINIMAL_VERSION>${ubi9-minimal.image.version}</UBI_MINIMAL_VERSION>
-                        <ARCH>${arch.type}</ARCH>
-                        <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
-                        <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
-                        <TEMURIN_JDK_VERSION>-${ubi9-minimal.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
-                        <CP_DOCKER_UTILS_VERSION>${git-repo.cp-docker-utils.tag}</CP_DOCKER_UTILS_VERSION>
-                    </buildArgs>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>package</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>io.fabric8</groupId>
