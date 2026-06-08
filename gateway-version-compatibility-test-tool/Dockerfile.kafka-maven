@@ -6,8 +6,10 @@ FROM confluentinc/cp-kafka:${KAFKA_VERSION}
 
 # Install JDK and tools, then install newer Maven
 USER root
-RUN dnf update -y && \
-    dnf install -y \
+# NOTE: do not run `dnf update -y` here. On the cp-kafka:8.0.0 base it pulls a
+# python3-libs whose _hashlib needs OPENSSL_3.4.0, which the base's bundled
+# /usr/local/lib64/libcrypto.so.3 does not provide, crashing dnf mid-build.
+RUN dnf install -y \
         java-11-openjdk-devel \
         wget \
         curl \
