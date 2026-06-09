@@ -16,7 +16,7 @@ RUN dnf install -y \
         curl \
         git && \
     dnf clean all && \
-    wget https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
+    wget --https-only https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
     tar xzf apache-maven-3.9.6-bin.tar.gz -C /opt && \
     ln -s /opt/apache-maven-3.9.6 /opt/maven && \
     rm apache-maven-3.9.6-bin.tar.gz
