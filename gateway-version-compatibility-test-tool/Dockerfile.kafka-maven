@@ -9,10 +9,11 @@ USER root
 # NOTE: do not run `dnf update -y` here. On the cp-kafka:8.0.0 base it pulls a
 # python3-libs whose _hashlib needs OPENSSL_3.4.0, which the base's bundled
 # /usr/local/lib64/libcrypto.so.3 does not provide, crashing dnf mid-build.
+# Don't add `curl` here: it conflicts with the base's curl-minimal, which already
+# provides /usr/bin/curl (the tool only needs basic HTTP GET).
 RUN dnf install -y \
         java-11-openjdk-devel \
         wget \
-        curl \
         git && \
     dnf clean all
 
