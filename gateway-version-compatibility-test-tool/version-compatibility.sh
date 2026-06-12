@@ -3,6 +3,17 @@
 # 16 combinations: Java clients only (4×4 matrix)
 
 GATEWAY_METRICS="http://localhost:9190/metrics"
+
+# Wait for the gateway admin endpoint to respond. The ubi9-micro gateway image
+# ships without curl, so readiness is polled from the host (which has curl)
+# instead of via an in-container Docker healthcheck.
+wait_for_gateway() {
+    for _ in $(seq 1 30); do
+        curl -sf "$GATEWAY_METRICS" > /dev/null 2>&1 && return 0
+        sleep 2
+    done
+    return 1
+}
 RESULTS_DIR="compatibility-results/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
@@ -169,9 +180,10 @@ run_compatibility_test() {
         fi
     fi
     
-    # Health checks will ensure services are ready
-    echo "Services started with health checks - verifying final connectivity..."
-    if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
+    # The ubi9-micro gateway image has no in-container curl, so gateway readiness
+    # is polled from the host instead of via a Docker healthcheck.
+    echo "Waiting for gateway to become ready..."
+    if ! wait_for_gateway; then
         echo "❌ Gateway not responding. Exiting test."
         # Create status file to track the failure
         echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"

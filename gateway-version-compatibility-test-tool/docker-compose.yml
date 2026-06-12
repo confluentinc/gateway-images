@@ -174,12 +174,6 @@ services:
               metrics: true
           advanced:
             useIoUring: false
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9190/metrics || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
   kafka-client-test:
     build:
       context: .
@@ -188,7 +182,7 @@ services:
         KAFKA_VERSION: ${KAFKA_CLIENT_VERSION}
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     container_name: kafka-client-test
     volumes:
       - ./ssl:/etc/kafka/secrets
