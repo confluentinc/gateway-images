@@ -50,13 +50,13 @@
                 <artifactId>jolokia-jvm</artifactId>
                 <version>${jolokia-jvm.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.prometheus.jmx</groupId>
                 <artifactId>jmx_prometheus_javaagent</artifactId>
                 <version>${jmx_prometheus_javaagent.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>disk-usage-agent</artifactId>
