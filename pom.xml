@@ -40,16 +40,9 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-bom</artifactId>
-                <version>2.25.4</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
-                <version>8.1.0</version>
+                <version>8.1.4-25</version>
             </dependency>
 
             <dependency>
@@ -57,13 +50,13 @@
                 <artifactId>jolokia-jvm</artifactId>
                 <version>${jolokia-jvm.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.prometheus.jmx</groupId>
                 <artifactId>jmx_prometheus_javaagent</artifactId>
                 <version>${jmx_prometheus_javaagent.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>disk-usage-agent</artifactId>
@@ -120,6 +113,9 @@
     <properties>
         <component.name>gateway</component.name>
         <io.confluent.gateway-images.version>1.2.0-0</io.confluent.gateway-images.version>
+        <!-- Pin kafka.version: common 8.0.6-35 bumped this to 8.0.6-10-ccs, whose
+             kafka_2.13 jar is not published. Override until that is fixed upstream. -->
+        <kafka.version>8.0.6-9-ccs</kafka.version>
         <arch.type>.arm64</arch.type>
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
