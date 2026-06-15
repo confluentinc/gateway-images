@@ -22,7 +22,7 @@
     <parent>
         <groupId>io.confluent</groupId>
         <artifactId>common</artifactId>
-        <version>[8.0.6-0, 8.0.7-0)</version>
+        <version>8.0.6-34</version>
     </parent>
 
     <groupId>io.confluent.gateway-images</groupId>
@@ -113,9 +113,6 @@
     <properties>
         <component.name>gateway</component.name>
         <io.confluent.gateway-images.version>1.2.0-0</io.confluent.gateway-images.version>
-        <!-- Pin kafka.version: common 8.0.6-35 bumped this to 8.0.6-10-ccs, whose
-             kafka_2.13 jar is not published. Override until that is fixed upstream. -->
-        <kafka.version>8.0.6-9-ccs</kafka.version>
         <arch.type>.arm64</arch.type>
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
