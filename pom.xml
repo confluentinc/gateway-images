@@ -40,13 +40,6 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-bom</artifactId>
-                <version>2.25.4</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
                 <version>8.1.0</version>
@@ -120,6 +113,7 @@
     <properties>
         <component.name>gateway</component.name>
         <io.confluent.gateway-images.version>1.2.0-0</io.confluent.gateway-images.version>
+        <log4j.version>2.25.4</log4j.version>
         <arch.type>.arm64</arch.type>
         <!--  This is a placeholder for the architecture of the image that we will need from input
          and the input will come in mvn command from semaphore.yml file -->
