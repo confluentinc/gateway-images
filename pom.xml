@@ -40,16 +40,9 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.apache.logging.log4j</groupId>
-                <artifactId>log4j-bom</artifactId>
-                <version>2.25.4</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
-                <version>8.1.0</version>
+                <version>8.1.4-25</version>
             </dependency>
 
             <dependency>
@@ -57,13 +50,13 @@
                 <artifactId>jolokia-jvm</artifactId>
                 <version>${jolokia-jvm.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.prometheus.jmx</groupId>
                 <artifactId>jmx_prometheus_javaagent</artifactId>
                 <version>${jmx_prometheus_javaagent.version}</version>
             </dependency>
-
+            
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>disk-usage-agent</artifactId>
