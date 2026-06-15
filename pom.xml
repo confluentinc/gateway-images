@@ -165,7 +165,7 @@
         <git-repo.cp-docker-utils.tag>v1.0.10</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.26.2-trixie</golang.image.version>
+        <golang.image.version>1.26.4-trixie</golang.image.version>
 
     </properties>
 </project>
