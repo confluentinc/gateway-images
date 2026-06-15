@@ -27,6 +27,32 @@
     <dependency>
       <groupId>io.confluent</groupId>
       <artifactId>utility-belt</artifactId>
+      <!-- utility-belt pulls in an older log4j (2.24.3); exclude it and
+           re-declare the artifacts we need at ${log4j.version} below. -->
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.logging.log4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- log4j re-declared explicitly (excluded from utility-belt above) -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <version>${log4j.version}</version>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>
