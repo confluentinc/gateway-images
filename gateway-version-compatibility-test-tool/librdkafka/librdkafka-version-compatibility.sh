@@ -8,6 +8,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 GATEWAY_METRICS="http://localhost:9190/metrics"
+
+# Wait for the gateway admin endpoint to respond. The ubi9-micro gateway image
+# ships without curl, so readiness is polled from the host (which has curl)
+# instead of via an in-container Docker healthcheck.
+wait_for_gateway() {
+    for _ in $(seq 1 30); do
+        curl -sf "$GATEWAY_METRICS" > /dev/null 2>&1 && return 0
+        sleep 2
+    done
+    return 1
+}
 RESULTS_DIR="$PARENT_DIR/compatibility-results/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
@@ -128,9 +139,9 @@ run_compatibility_test() {
         return 1
     fi
 
-    # Verify gateway is up
-    echo "Verifying gateway connectivity..."
-    if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
+    # Micro gateway image has no in-container curl; poll readiness from the host.
+    echo "Waiting for gateway to become ready..."
+    if ! wait_for_gateway; then
         echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -241,7 +252,7 @@ EOF
     if ! docker-compose -f docker-compose-librdkafka-reauth-kraft.yml up -d --build; then
         echo "REAUTH_SETUP_FAILED: reauth docker-compose failed to start"
         REAUTH_EXIT_CODE=1
-    elif ! curl -s "$GATEWAY_METRICS" > /dev/null; then
+    elif ! wait_for_gateway; then
         echo "REAUTH_SETUP_FAILED: Gateway not responding"
         docker-compose -f docker-compose-librdkafka-reauth-kraft.yml down -v
         REAUTH_EXIT_CODE=1
