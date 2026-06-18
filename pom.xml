@@ -22,7 +22,7 @@
     <parent>
         <groupId>io.confluent</groupId>
         <artifactId>common</artifactId>
-        <version>[8.0.4-0, 8.0.5-0)</version>
+        <version>[8.2.2-0, 8.2.3-0)</version>
     </parent>
 
     <groupId>io.confluent.gateway-images</groupId>
@@ -40,6 +40,13 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-bom</artifactId>
+                <version>2.25.4</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
                 <version>8.1.0</version>
@@ -50,13 +57,13 @@
                 <artifactId>jolokia-jvm</artifactId>
                 <version>${jolokia-jvm.version}</version>
             </dependency>
-            
+
             <dependency>
                 <groupId>io.prometheus.jmx</groupId>
                 <artifactId>jmx_prometheus_javaagent</artifactId>
                 <version>${jmx_prometheus_javaagent.version}</version>
             </dependency>
-            
+
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>disk-usage-agent</artifactId>
@@ -76,18 +83,12 @@
             <plugin>
                 <groupId>com.spotify</groupId>
                 <artifactId>dockerfile-maven-plugin</artifactId>
-                <configuration>
-                    <buildArgs>
-                        <APP_UID>${app.uid}</APP_UID>
-                        <APP_GID>${app.gid}</APP_GID>
-                        <UBI9_VERSION>${ubi9.image.version}</UBI9_VERSION>
-                        <UBI_MICRO_VERSION>${ubi9-micro.image.version}</UBI_MICRO_VERSION>
-                        <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
-                        <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
-                        <TEMURIN_JDK_VERSION>-${ubi9-minimal.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
-                        <CP_DOCKER_UTILS_VERSION>${git-repo.cp-docker-utils.tag}</CP_DOCKER_UTILS_VERSION>
-                    </buildArgs>
-                </configuration>
+                <executions>
+                    <execution>
+                        <id>package</id>
+                        <phase>none</phase>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>io.fabric8</groupId>
@@ -164,10 +165,10 @@
         <ubi9-minimal.temurin-21-jdk.version>21.0.10.0.0.7-0</ubi9-minimal.temurin-21-jdk.version>
 
         <!-- GitHub Repository Tags -->
-        <git-repo.cp-docker-utils.tag>v1.0.10</git-repo.cp-docker-utils.tag>
+        <git-repo.cp-docker-utils.tag>v1.0.16</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.26.2-trixie</golang.image.version>
+        <golang.image.version>1.26.4-trixie</golang.image.version>
 
     </properties>
 </project>
