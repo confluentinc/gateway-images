@@ -18,13 +18,14 @@ ARG GOLANG_VERSION
 ARG UBI9_VERSION
 ARG UBI_MICRO_VERSION
 
-# Stage 1: Build ub utility binary
+# Stage 1: Build ub and package_dedupe utility binaries
 FROM docker.io/golang:${GOLANG_VERSION} AS build-utilities
 
 ARG CP_DOCKER_UTILS_VERSION
 
 ENV GO_BIN="/go/bin"
 RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/ub@${CP_DOCKER_UTILS_VERSION}
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/package_dedupe@${CP_DOCKER_UTILS_VERSION}
 
 
 # Stage 2: Install packages to /microdir using full ubi9 with dnf
@@ -104,6 +105,7 @@ ENV COMPONENT_CONFIG_DIR=/etc/confluent-${COMPONENT}
 USER root
 
 COPY --from=build-utilities /go/bin/ub /usr/bin/ub
+COPY --from=build-utilities /go/bin/package_dedupe /usr/local/bin/package_dedupe
 COPY --from=builder /microdir/ /
 
 RUN mkdir -p /etc/confluent/docker /usr/logs /licenses \
@@ -123,6 +125,9 @@ COPY --chown=${APP_UID}:${APP_GID} target/${ARTIFACT_ID}-${PROJECT_VERSION}-pack
 # /usr/share/java/cp-base-java is the default java classpath for ub
 # jars in cp-base-new and cp-base-java are identical, so create a symlink to avoid duplicating files
 RUN ln -s /usr/share/java/cp-base-new /usr/share/java/cp-base-java
+
+RUN echo "===> Deduping jars in /usr/share/java ..." \
+    && /usr/local/bin/package_dedupe /usr/share/java
 
 COPY --chown=${APP_UID}:${APP_GID} include/etc/confluent/docker /etc/confluent/docker
 COPY license.txt /licenses/
