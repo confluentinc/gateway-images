@@ -11,6 +11,14 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID
     valueSubjectNameStrategy: TOPIC
+    # Rule executor lets the Gateway run the CSFLE field-encryption rule at
+    # SCHEMA_RULES level. The local KMS secret is supplied here so the Gateway
+    # can wrap/unwrap data keys on behalf of clients.
+    # NOTE: demo secret only — supply via a real KMS / secret store in production.
+    schemaRegistryConfigs:
+      rule.executors: "encryptField"
+      rule.executors.encryptField.class: "io.confluent.kafka.schemaregistry.encryption.FieldEncryptionExecutor"
+      rule.executors.encryptField.param.secret: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     # Per-topic overrides demonstrate each validation level on the same route.
     topics:
       - name: gov-none
@@ -19,7 +27,7 @@ gateway:
         valueValidationLevel: ID
       - name: gov-schema
         valueValidationLevel: SCHEMA
-      - name: gov-rules
+      - name: gov-encrypt-field
         valueValidationLevel: SCHEMA_RULES
 
   streamingDomains:
