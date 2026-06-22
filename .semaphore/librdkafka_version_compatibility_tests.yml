@@ -18,6 +18,12 @@ global_job_config:
       - checkout
       - . vault-setup
       - . vault-sem-get-secret v1/ci/kv/cpc-gateway/slack-webhook-tests-notifications
+      # INC-11655 / DP-19040: the s1-prod-ubuntu24 AMI's buildx-builder (docker-container driver) boots
+      # BuildKit by pulling buildkit-semaphoreci from prod ECR (519856050701) at build time. The
+      # root-account-access role assumed below cannot pull cross-account, so boot/cache the builder now,
+      # under the default (pull-capable) agent identity; the running buildkit is reused after the switch.
+      # Remove once the fleet rollback (ci-build-agent-infra#2321) lands. No-op on the remote-driver AMI.
+      - docker buildx inspect --bootstrap buildx-builder
       - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
