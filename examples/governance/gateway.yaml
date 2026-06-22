@@ -11,9 +11,16 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID
     valueSubjectNameStrategy: TOPIC
+    # Per-topic overrides demonstrate each validation level on the same route.
     topics:
-      - name: orders
+      - name: gov-none
+        valueValidationLevel: NONE
+      - name: gov-id
+        valueValidationLevel: ID
+      - name: gov-schema
         valueValidationLevel: SCHEMA
+      - name: gov-rules
+        valueValidationLevel: SCHEMA_RULES
 
   streamingDomains:
     - name: local-kafka
