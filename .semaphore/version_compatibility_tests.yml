@@ -22,7 +22,8 @@ global_job_config:
       # root-account-access role assumed below cannot pull cross-account, so boot/cache the builder now,
       # under the default (pull-capable) agent identity; the running buildkit is reused after the switch.
       # Remove once the fleet rollback (ci-build-agent-infra#2321) lands. No-op on the remote-driver AMI.
-      - docker buildx inspect --bootstrap buildx-builder
+      # Fall back to the current/default builder if the AMI ever names it something other than buildx-builder.
+      - docker buildx inspect --bootstrap buildx-builder || docker buildx inspect --bootstrap
       - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
