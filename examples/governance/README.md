@@ -117,7 +117,7 @@ JAAS='org.apache.kafka.common.security.plain.PlainLoginModule required username=
 ```bash
 echo '{"order_id":"O1","product":"widget","quantity":2,"price":9.99}' | \
 docker exec -i schema-registry kafka-avro-console-producer \
-  --broker-list gateway:6969 --topic gov-schema \
+  --bootstrap-server gateway:6969 --topic gov-schema \
   --property schema.registry.url=http://schema-registry:8081 \
   --property value.schema.id=1 \
   --producer-property security.protocol=SASL_PLAINTEXT \
@@ -131,7 +131,7 @@ docker exec -i schema-registry kafka-avro-console-producer \
 ```bash
 echo "plain-text-no-schema-id" | \
 docker exec -i kafka kafka-console-producer \
-  --broker-list gateway:6969 --topic gov-id \
+  --bootstrap-server gateway:6969 --topic gov-id \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config="$JAAS"
@@ -145,7 +145,7 @@ Produce an `Event` record (id 2, registered only under `events-value`) to a topi
 ```bash
 echo '{"event_id":"E1","kind":"click"}' | \
 docker exec -i schema-registry kafka-avro-console-producer \
-  --broker-list gateway:6969 --topic gov-schema \
+  --bootstrap-server gateway:6969 --topic gov-schema \
   --property schema.registry.url=http://schema-registry:8081 \
   --property auto.register.schemas=false --property use.schema.id=2 --property value.schema.id=2 \
   --producer-property security.protocol=SASL_PLAINTEXT \
@@ -161,14 +161,14 @@ The same bytes — a valid id=1 prefix followed by non-Avro garbage — behave d
 ```bash
 # At ID level: ACCEPTED (payload not inspected)
 docker exec -i kafka bash -c "printf '\x00\x00\x00\x00\x01GARBAGE' | \
-  kafka-console-producer --broker-list gateway:6969 --topic gov-id \
+  kafka-console-producer --bootstrap-server gateway:6969 --topic gov-id \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config='$JAAS'"
 
 # At SCHEMA level: REJECTED — "Error deserializing Avro message ... id=1"
 docker exec -i kafka bash -c "printf '\x00\x00\x00\x00\x01GARBAGE' | \
-  kafka-console-producer --broker-list gateway:6969 --topic gov-schema \
+  kafka-console-producer --bootstrap-server gateway:6969 --topic gov-schema \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config='$JAAS'"
@@ -187,7 +187,7 @@ Because the client must send **plaintext** (the Gateway does the encrypting), th
 ```bash
 echo '{"payment_id":"P1","card_number":"4111-2222-3333-4444","amount":42.5}' | \
 docker exec -i schema-registry kafka-avro-console-producer \
-  --broker-list gateway:6969 --topic gov-encrypt-field \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-field \
   --property schema.registry.url=http://schema-registry:8081 \
   --property value.schema.id=3 --property auto.register.schemas=false \
   --property rule.executors._default_.disabled=true \
