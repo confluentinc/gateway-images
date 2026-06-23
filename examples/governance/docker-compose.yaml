@@ -52,8 +52,8 @@ services:
       SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID: 'schema-registry'
       SCHEMA_REGISTRY_CONFLUENT_LICENSE: ${CONFLUENT_LICENSE:?Set CONFLUENT_LICENSE env var with a valid Enterprise license JWT}
       SCHEMA_REGISTRY_CONFLUENT_LICENSE_ADDON_CSFLE: ${CONFLUENT_LICENSE:?Set CONFLUENT_LICENSE env var with a valid Enterprise license JWT}
-      # Enable data-contract rulesets (RuleSet) + the DEK Registry so CSFLE rules
-      # (SCHEMA_RULES) can be stored and their data encryption keys managed.
+      # Enable data-contract rulesets (RuleSet) + the DEK Registry so encryption
+      # rules (SCHEMA_RULES) can be stored and their data encryption keys managed.
       SCHEMA_REGISTRY_RESOURCE_EXTENSION_CLASS: 'io.confluent.kafka.schemaregistry.rulehandler.RuleSetResourceExtension,io.confluent.dekregistry.DekRegistryResourceExtension'
 
   gateway:

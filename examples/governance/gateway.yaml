@@ -11,9 +11,10 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID
     valueSubjectNameStrategy: TOPIC
-    # Rule executors let the Gateway run CSFLE rules at SCHEMA_RULES level on
-    # behalf of clients: encryptField for field-level ENCRYPT, encryptPayload
-    # for full-payload ENCRYPT_PAYLOAD. The local KMS secret is supplied here.
+    # Rule executors let the Gateway centrally encrypt data and enforce
+    # governance policies at SCHEMA_RULES level: encryptField for field-level
+    # ENCRYPT, encryptPayload for full-payload ENCRYPT_PAYLOAD. The local KMS
+    # secret is supplied here so the encryption runs at the Gateway.
     # NOTE: demo secret only — supply via a real KMS / secret store in production.
     schemaRegistryConfigs:
       rule.executors: "encryptField,encryptPayload"
