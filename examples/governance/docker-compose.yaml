@@ -53,7 +53,7 @@ services:
       SCHEMA_REGISTRY_CONFLUENT_LICENSE: ${CONFLUENT_LICENSE:?Set CONFLUENT_LICENSE env var with a valid Enterprise license JWT}
 
   gateway:
-    image: 519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/confluentinc/cpc-gateway:master-latest-ubi9
+    image: ${GATEWAY_IMAGE:?Set GATEWAY_IMAGE env var to a CPC Gateway image tag or digest}
     container_name: gateway
     networks:
       - gateway-network

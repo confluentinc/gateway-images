@@ -33,18 +33,20 @@ The example shows the **four validation levels** (`NONE`, `ID`, `SCHEMA`, `SCHEM
 
 ## Quick Start
 
-### 1. Set your license
+### 1. Set your license and Gateway image
 
-The compose file reads `CONFLUENT_LICENSE`. Either export it in your shell:
+The compose file reads two variables: `CONFLUENT_LICENSE` (the license JWT) and `GATEWAY_IMAGE` (the CPC Gateway image tag or digest to run). Either export them in your shell:
 
 ```bash
 export CONFLUENT_LICENSE='<your-license-jwt>'
+export GATEWAY_IMAGE='<cpc-gateway-image:tag>'
 ```
 
 …or create a `.env` file in this directory (auto-read by Docker Compose, and gitignored):
 
 ```bash
 echo "CONFLUENT_LICENSE=<your-license-jwt>" > .env
+echo "GATEWAY_IMAGE=<cpc-gateway-image:tag>" >> .env
 ```
 
 ### 2. Start the stack
