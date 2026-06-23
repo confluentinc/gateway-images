@@ -231,7 +231,8 @@ run_compatibility_test() {
     # Determine Java version and Maven settings based on Kafka client version
     java_settings=""
     if [[ "$client_ver" == "8.0.0" ]]; then
-        java_settings="export JAVA_HOME=/usr/lib/jvm/java-11-zulu-openjdk-ca && export PATH=\$JAVA_HOME/bin:\$PATH && "
+        # Dockerfile sets JAVA_HOME=/usr/lib/jvm/java-11-openjdk (Red Hat OpenJDK);
+        # don't override it — the Zulu path no longer exists in this image.
         maven_java_args="-Dmaven.compiler.source=11 -Dmaven.compiler.target=11"
         echo "🔧 Using Java 11 for Kafka client $client_ver (required for 8.0.0+)"
     else
