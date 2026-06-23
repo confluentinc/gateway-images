@@ -29,7 +29,7 @@ The example shows the **four validation levels** (`NONE`, `ID`, `SCHEMA`, `SCHEM
 
 - Docker and Docker Compose
 - Access to the CPC Gateway Docker image
-- A valid **Confluent license JWT** — all three components (Confluent Server, Schema Registry, CPC Gateway) require a license to run. The `SCHEMA_RULES` / encryption scenarios additionally require the **CSFLE add-on** on the license.
+- A valid **Confluent license JWT** — all three components (Confluent Server, Schema Registry, CPC Gateway) require a license to run. The encryption scenarios (`SCHEMA_RULES`) require the **CPC license** for CPC Gateway, or the **CC Gateway license** for CC Gateway.
 
 ## Quick Start
 
