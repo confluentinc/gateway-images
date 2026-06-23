@@ -5,10 +5,12 @@ This directory contains the Docker configuration files for the Confluent Gateway
 **Environment Variables:** Set one of the following environment variables to configure the gateway:
 - `GATEWAY_CONFIG`: YAML configuration content (takes precedence)
 - `GATEWAY_CONFIG_TEMPLATE`: Path to configuration template file (e.g `/etc/confluent/docker/single-route-plaintext-passthrough.yaml.template`)
-- `GATEWAY_CONFIG_FILE`: Path to the final configuration file (defaults to `/etc/${COMPONENT}/gateway-config.yaml`)
+- `GATEWAY_TMP_DIR`: Directory the entrypoint writes startup-generated config to (the inline/templated config, the node config passed to the Gateway, and licenses). Defaults to `/tmp/gateway`. Point it at a writable volume to run with a read-only root filesystem.
+- `GATEWAY_CONFIG_FILE`: Path to the final configuration file (defaults to `${GATEWAY_TMP_DIR}/gateway-config.yaml`)
 
 **Default Configuration:**
-- `GATEWAY_CONFIG_FILE`: `/etc/gateway/gateway-config.yaml`
+- `GATEWAY_TMP_DIR`: `/tmp/gateway`
+- `GATEWAY_CONFIG_FILE`: `/tmp/gateway/gateway-config.yaml`
 
 ### minimal config for `single-route-plaintext-passthrough.yaml.template`
 ```yaml
