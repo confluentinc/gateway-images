@@ -77,8 +77,9 @@ The registration script creates these schemas:
 | **1** | `Order` | `order_id, product, quantity, price` | `orders-value`, `gov-id-value`, `gov-schema-value` |
 | **2** | `Event` | `event_id, kind` | `events-value` |
 | **3** | `Payment` | `payment_id, card_number (PII), amount` | `gov-encrypt-field-value` |
+| **4** | `Transaction` | `txn_id, account, amount` | `gov-encrypt-payload-value` |
 
-The `Payment` schema tags `card_number` with `confluent:tags: ["PII"]` and carries a data-contract **`ENCRYPT` rule** targeting that tag — see [Field-Level Encryption](#field-level-encryption-schema_rules) below.
+The `Payment` schema tags `card_number` with `confluent:tags: ["PII"]` and carries a data-contract **`ENCRYPT` rule** targeting that tag — see [Field-Level Encryption](#field-level-encryption-schema_rules) below. The `Transaction` schema carries an **`ENCRYPT_PAYLOAD` rule** that encrypts the whole record — see [Full-Payload Encryption](#full-payload-encryption-schema_rules) below.
 
 ### Topics and their validation levels
 
@@ -90,6 +91,7 @@ Topics are auto-created on first produce. Each is pinned to a validation level v
 | `gov-id`           | `ID`           | `gov-id-value`           | `Order` (id 1) |
 | `gov-schema`       | `SCHEMA`       | `gov-schema-value`       | `Order` (id 1) |
 | `gov-encrypt-field`| `SCHEMA_RULES` | `gov-encrypt-field-value`| `Payment` (id 3) — `card_number` encrypted at the Gateway |
+| `gov-encrypt-payload`| `SCHEMA_RULES` | `gov-encrypt-payload-value`| `Transaction` (id 4) — whole record encrypted at the Gateway |
 
 ### What each validation level enforces
 
@@ -218,6 +220,49 @@ docker exec schema-registry kafka-avro-console-consumer \
 
 Only `card_number` is encrypted (it's the only PII-tagged field); `payment_id` and `amount` stay in the clear.
 
+### Full-Payload Encryption (SCHEMA_RULES)
+
+Field-level encryption protects tagged fields. **Full-payload encryption** protects the *entire* record: the `Transaction` schema (id 4) on `gov-encrypt-payload` carries an `ENCRYPT_PAYLOAD` rule (an *encoding* rule, not a field rule), so the **Gateway encrypts the whole serialized value** before it reaches the broker. As with field-level encryption this is *offloaded* — the producer sends plaintext (`rule.executors._default_.disabled=true`) and holds no key.
+
+**Produce a `Transaction` (client sends plaintext; Gateway encrypts the whole record):**
+```bash
+echo '{"txn_id":"T1","account":"ACME-001","amount":9999.0}' | \
+docker exec -i schema-registry kafka-avro-console-producer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-payload \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property value.schema.id=4 --property auto.register.schemas=false \
+  --property rule.executors._default_.disabled=true \
+  --producer-property security.protocol=SASL_PLAINTEXT \
+  --producer-property sasl.mechanism=PLAIN \
+  --producer-property sasl.jaas.config="$JAAS"
+```
+
+**(a) Read the raw bytes straight from the broker (bypassing the Gateway) — the whole value is ciphertext (no field is readable):**
+```bash
+docker exec kafka kafka-console-consumer \
+  --bootstrap-server kafka:29092 --topic gov-encrypt-payload --from-beginning --timeout-ms 6000 \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# e.g. <schema-id prefix><binary ciphertext> — neither "T1" nor "ACME-001" appears
+```
+
+**(b) Read back through the Gateway — the record is decrypted:**
+```bash
+docker exec schema-registry kafka-avro-console-consumer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-payload --from-beginning \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property rule.executors._default_.disabled=true \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# {"txn_id":"T1","account":"ACME-001","amount":9999.0}
+```
+
+Unlike field-level encryption, **no field stays in the clear** — `txn_id`, `account`, and `amount` are all inside the encrypted payload.
+
+> **Field vs full-payload:** field-level (`ENCRYPT`) targets tagged fields and leaves the rest readable — good for selective PII protection while keeping the record partially queryable. Full-payload (`ENCRYPT_PAYLOAD`) encrypts everything — good when the whole record is sensitive.
+
 ### Verify — consume to confirm what landed
 
 ```bash
@@ -240,6 +285,7 @@ Only accepted records appear — rejected records never reached the broker.
 | 4 | `gov-id` (ID) | id=1 prefix + garbage | accepted |
 | 4 | `gov-schema` (SCHEMA) | id=1 prefix + garbage | rejected (`Error deserializing Avro message`) |
 | 5 | `gov-encrypt-field` (SCHEMA_RULES) | `Payment` id=3 plaintext | accepted; `card_number` encrypted at rest, decrypted on read-back |
+| 6 | `gov-encrypt-payload` (SCHEMA_RULES) | `Transaction` id=4 plaintext | accepted; whole record encrypted at rest, decrypted on read-back |
 
 ## Gateway Configuration
 
@@ -251,12 +297,14 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID          # default for any topic not listed below
     valueSubjectNameStrategy: TOPIC   # subject = {topic}-value
-    # Local KMS secret so the Gateway can run the CSFLE field-encryption rule
-    # on behalf of clients (demo secret only — use a real KMS in production).
+    # Local KMS secret so the Gateway can run encryption rules centrally
+    # (demo secret only — use a real KMS in production).
     schemaRegistryConfigs:
-      rule.executors: "encryptField"
+      rule.executors: "encryptField,encryptPayload"
       rule.executors.encryptField.class: "io.confluent.kafka.schemaregistry.encryption.FieldEncryptionExecutor"
       rule.executors.encryptField.param.secret: "<base64-local-kms-secret>"
+      rule.executors.encryptPayload.class: "io.confluent.kafka.schemaregistry.encryption.EncryptionExecutor"
+      rule.executors.encryptPayload.param.secret: "<base64-local-kms-secret>"
     topics:
       - name: gov-none
         valueValidationLevel: NONE
@@ -265,6 +313,8 @@ gateway:
       - name: gov-schema
         valueValidationLevel: SCHEMA
       - name: gov-encrypt-field
+        valueValidationLevel: SCHEMA_RULES
+      - name: gov-encrypt-payload
         valueValidationLevel: SCHEMA_RULES
 ```
 
