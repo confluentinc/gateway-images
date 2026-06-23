@@ -93,7 +93,7 @@ Topics are auto-created on first produce. Each is pinned to a validation level v
 | `NONE` | Nothing — all records accepted. |
 | `ID` | Value must carry a valid wire-format schema ID **and** that ID must be registered under the topic's subject. Does **not** inspect payload content. |
 | `SCHEMA` | Everything `ID` checks **plus** the payload must successfully deserialize against the schema. |
-| `SCHEMA_RULES` | Everything `SCHEMA` checks **plus** the schema's data-contract rules execute (e.g. CSFLE field-level encryption). |
+| `SCHEMA_RULES` | `SCHEMA` + Schema Registry rules (encryption, data quality) executed |
 
 > **Tip:** keys and values are governed independently. This example sets `keyValidationLevel: NONE` (keys ungoverned) and overrides `valueValidationLevel` per topic. To govern keys, register a `<topic>-key` subject and raise `keyValidationLevel`.
 
