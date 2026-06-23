@@ -185,7 +185,8 @@ run_compatibility_test() {
     echo "Waiting for gateway to become ready..."
     if ! wait_for_gateway; then
         echo "❌ Gateway not responding. Exiting test."
-        # Create status file to track the failure
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
         echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -194,9 +195,12 @@ run_compatibility_test() {
     fi
 
     # if kafka is not up, exit
-    if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
-        echo "❌ Kafka server not responding. Exiting test."
-        # Create status file to track the failure
+    KAFKA_READINESS_OUT=$(docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "❌ Kafka server not responding. Output:"
+        echo "$KAFKA_READINESS_OUT"
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
         echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -345,6 +349,12 @@ run_compatibility_test() {
     else
         echo "❌ JUnit tests failed for client $client_ver with server $server_ver"
         echo "   Check JUnit XML reports at: $JUNIT_RESULTS_DIR"
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
+        echo "FAILED: JUnit tests failed" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: JUNIT_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
     
@@ -363,8 +373,8 @@ run_compatibility_test() {
     curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
     
     # Cleanup
-    docker-compose -f docker-compose.yml down
-    
+    docker-compose -f $COMPOSE_FILE down
+
     echo "Completed: $test_id"
 }
 
@@ -423,17 +433,18 @@ main() {
     
     local test_count=0
     local total_tests=$total_combinations
+    local overall_failed=0
 
     # start timer
     CURRENT_TIME=$(date +%s)
-    
+
     # Run all combinations
     for client_ver in "${CLIENTS[@]}"; do
         for server_ver in "${SERVERS[@]}"; do
             test_count=$((test_count + 1))
             echo "[$test_count/$total_tests] Testing combination..."
-            run_compatibility_test $client_ver $server_ver
-            
+            run_compatibility_test $client_ver $server_ver || overall_failed=1
+
             # Brief pause between tests
             sleep 3
         done
@@ -444,9 +455,10 @@ main() {
     ELAPSED_TIME=$((END_TIME - CURRENT_TIME))
     echo ""
     echo "Total testing time: $ELAPSED_TIME seconds"
-    
+
     # Generate final reports
     generate_final_report
+    return $overall_failed
 }
 
 # Usage
@@ -462,10 +474,12 @@ case "$1" in
         fi
         setup_python_env  # Set up Python environment before running tests
         run_compatibility_test $2 $3
+        SINGLE_RC=$?
         # Generate report for single test
         source venv/bin/activate
         python3 enhanced_metrics_parser.py "$RESULTS_DIR"
         deactivate
+        exit $SINGLE_RC
         ;;
     "--parse")
         if [ $# -ne 2 ]; then
