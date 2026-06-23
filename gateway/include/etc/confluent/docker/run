@@ -35,6 +35,11 @@ if [ ! -w "${GATEWAY_TMP_DIR}" ]; then
   exit 1
 fi
 
+# Point the JVM temp dir at the writable generated-config directory. The Gateway writes its
+# generated runtime config under java.io.tmpdir; without this it would default to /tmp, which is
+# not writable under readOnlyRootFilesystem: true.
+export GATEWAY_OPTS="${GATEWAY_OPTS:-} -Djava.io.tmpdir=${GATEWAY_TMP_DIR}"
+
 # configure runs as a child process, so the variables it exports do not propagate back to run.
 # The contract between configure and run is the file at a well-known path, not the environment:
 # configure writes the resolved config to ${GATEWAY_TMP_DIR}/gateway-config.yaml, and run defaults
@@ -42,6 +47,12 @@ fi
 # container env var (e.g. mounted by confluent-operator), which both scripts see directly.
 if [ -z "$GATEWAY_CONFIG_FILE" ]; then
   GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
+fi
+
+if [ ! -f "$GATEWAY_CONFIG_FILE" ]; then
+  echo "ERROR: Gateway config file '${GATEWAY_CONFIG_FILE}' does not exist. Provide one of" >&2
+  echo "       GATEWAY_CONFIG_FILE, GATEWAY_CONFIG, or GATEWAY_CONFIG_TEMPLATE (see configure)." >&2
+  exit 1
 fi
 
 if [ -z "$GATEWAY_LOG_REDACTOR_RULES" ] && [ -f "/etc/gateway/log-redactor-rules.json" ]; then
