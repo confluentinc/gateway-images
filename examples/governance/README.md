@@ -1,6 +1,6 @@
-# CPC Gateway — Schema Governance
+# Centralised Governance Policy Enforcement with CPC Gateway
 
-This example demonstrates **schema governance** with CPC Gateway. The Gateway validates that records produced to Kafka conform to schemas registered in Confluent Schema Registry — enforced centrally at the Gateway, with **zero client changes**. Records that violate the configured policy are rejected before they reach the broker.
+This example demonstrates **centralised data governance enforcement** with CPC Gateway. The Gateway validates that records produced to Kafka conform to schemas registered in Confluent Schema Registry — enforced centrally at the Gateway, with **zero client changes**. Records that violate the configured policy are rejected before they reach the broker.
 
 The example shows the **four validation levels** (`NONE`, `ID`, `SCHEMA`, `SCHEMA_RULES`) side by side, each applied to a different topic on the same route.
 
@@ -25,12 +25,10 @@ The example shows the **four validation levels** (`NONE`, `ID`, `SCHEMA`, `SCHEM
 - The **Gateway** inspects each record's value against the validation level configured for that topic.
 - Conforming records pass through; violations are rejected with `INVALID_RECORD`.
 
-> **Note:** Enforcement reads the schema ID from the Confluent **wire-format prefix** (`[0x00][4-byte schema ID]`) inside the record. A producer using a **Confluent serializer** (e.g. `KafkaAvroSerializer`) emits this prefix. A **non-Confluent serializer** (plain `StringSerializer`, raw bytes) does not, so the Gateway can only reject it on a presence check — it cannot validate or transcode it.
-
 ## Prerequisites
 
 - Docker and Docker Compose
-- Access to the CPC Gateway Docker image (internal ECR)
+- Access to the CPC Gateway Docker image
 - A valid **Confluent license JWT** — all three components (Confluent Server, Schema Registry, CPC Gateway) require a license to run. The `SCHEMA_RULES` / encryption scenarios additionally require the **CSFLE add-on** on the license.
 
 ## Quick Start
@@ -70,14 +68,12 @@ This starts three containers:
 
 ### Schemas and subjects
 
-The registration script creates **two distinct schemas**. Schema IDs are **global and content-deduplicated** — the same `Order` schema reused under three subjects keeps the same ID (`1`):
+The registration script creates **two distinct schemas**:
 
 | Schema ID | Schema | Fields | Registered under subjects |
 |---|---|---|---|
 | **1** | `Order` | `order_id, product, quantity, price` | `orders-value`, `gov-id-value`, `gov-schema-value` |
 | **2** | `Event` | `event_id, kind` | `events-value` |
-
-> **Schemas vs subjects vs IDs:** the **ID** identifies a unique schema globally; the **subject** (`<topic>-value` under the `TOPIC` strategy) is the per-topic slot it's registered under. The wire-format prefix carries the **ID**; the Gateway derives the expected **subject** from the topic and checks that the ID is registered *under that subject*.
 
 ### Topics and their validation levels
 
