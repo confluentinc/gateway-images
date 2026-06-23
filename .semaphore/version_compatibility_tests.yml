@@ -70,41 +70,23 @@ blocks:
                 echo "Creating test summary..."
                 
                 # Count total tests and analyze results
-                # Count metrics files (successful tests) and status files (all tests including failures)
-                METRICS_FILES=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_metrics.txt" | wc -l)
-                STATUS_FILES=$(find compatibility-results/${LATEST_RESULTS_DIR} -name "*_status.txt" | wc -l)
-                
-                # Total tests should be the maximum of metrics files or status files
-                # since status files are created for all tests (success and failure)
-                TOTAL_TESTS=$([ ${STATUS_FILES} -gt ${METRICS_FILES} ] && echo ${STATUS_FILES} || echo ${METRICS_FILES})
-                
-                FAILED_TESTS=0
-                PASSED_TESTS=0
+                # Count outcomes directly from result files. The Python summary only covers
+                # combos that produced metrics (_metrics.txt), so setup-failed and JUnit-failed
+                # combos are invisible to grep-based counting. Read _status.txt files instead.
+                PASSED_TESTS=$(find "compatibility-results/${LATEST_RESULTS_DIR}" -name "*_metrics.txt" | wc -l | tr -d ' ')
                 SETUP_FAILED_TESTS=0
-                
-                if [ -f "compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt" ]; then
-                  # Count different test result types
-                  FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
-                  PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
-                  SETUP_FAILED_TESTS=$(grep -c "🚫 SETUP_FAILED" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
-                  
-                  # print raw counts for debugging
-                  echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}, Setup Failed: ${SETUP_FAILED_TESTS}"
-                  
-                  # clean numbers
-                  FAILED_TESTS=$(clean_number "${FAILED_TESTS}")
-                  PASSED_TESTS=$(clean_number "${PASSED_TESTS}")
-                  SETUP_FAILED_TESTS=$(clean_number "${SETUP_FAILED_TESTS}")
-                  TOTAL_TESTS=$(clean_number "${TOTAL_TESTS}")
-                  
-                  # If we have a mismatch, calculate passed from total
-                  if [ $((PASSED_TESTS + FAILED_TESTS + SETUP_FAILED_TESTS)) -ne ${TOTAL_TESTS} ] && [ ${TOTAL_TESTS} -gt 0 ]; then
-                    PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS - SETUP_FAILED_TESTS))
+                FAILED_TESTS=0
+                while IFS= read -r sf; do
+                  if grep -q "^SETUP_FAILED:" "$sf" 2>/dev/null; then
+                    SETUP_FAILED_TESTS=$((SETUP_FAILED_TESTS + 1))
+                  else
+                    FAILED_TESTS=$((FAILED_TESTS + 1))
                   fi
-                else
-                  # Fallback calculation if summary doesn't exist
-                  PASSED_TESTS=$((TOTAL_TESTS - FAILED_TESTS))
-                fi
+                done < <(find "compatibility-results/${LATEST_RESULTS_DIR}" -name "*_status.txt")
+                TOTAL_TESTS=$((PASSED_TESTS + FAILED_TESTS + SETUP_FAILED_TESTS))
+
+                # print raw counts for debugging
+                echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}, Setup Failed: ${SETUP_FAILED_TESTS}"
                 
                 # Calculate success rate safely
                 if [ ${TOTAL_TESTS} -gt 0 ]; then
@@ -183,21 +165,20 @@ blocks:
             - |
               # Check if SLACK_WEBHOOK_URL is set
               if [ -n "$SLACK_WEBHOOK_URL" ]; then
-                # Determine notification color and status based on test results
-                if [ "$TEST_FAILED" = "true" ]; then
-                  # Script execution failed (e.g., script error, complete failure)
-                  COLOR="danger"
-                  STATUS="❌ FAILED"
-                elif [ "${FAILED_TESTS:-0}" -gt 0 ]; then
-                  # Actual test failures occurred
+                # Determine notification color and status based on test results.
+                # Check FAILED_TESTS/SETUP_FAILED_TESTS before TEST_FAILED so that
+                # setup-only failures (which also set TEST_FAILED via exit code) show
+                # the correct warning color instead of danger.
+                if [ "${FAILED_TESTS:-0}" -gt 0 ]; then
                   COLOR="danger"
                   STATUS="❌ TEST FAILURES"
                 elif [ "${SETUP_FAILED_TESTS:-0}" -gt 0 ]; then
-                  # Setup failures occurred but no test failures
                   COLOR="warning"
                   STATUS="⚠️ SETUP FAILURES"
+                elif [ "$TEST_FAILED" = "true" ]; then
+                  COLOR="danger"
+                  STATUS="❌ FAILED"
                 else
-                  # All tests passed
                   COLOR="good"
                   STATUS="✅ PASSED"
                 fi
@@ -237,15 +218,15 @@ blocks:
             
             # Fail the job if tests failed (but not for setup failures)
             - |
-              if [ "$TEST_FAILED" = "true" ]; then
-                echo "❌ Version compatibility tests failed (script execution error)"
-                exit 1
-              elif [ "${FAILED_TESTS:-0}" -gt 0 ]; then
+              if [ "${FAILED_TESTS:-0}" -gt 0 ]; then
                 echo "❌ Version compatibility tests failed (${FAILED_TESTS} test failures)"
                 exit 1
               elif [ "${SETUP_FAILED_TESTS:-0}" -gt 0 ]; then
                 echo "⚠️ Version compatibility tests completed with ${SETUP_FAILED_TESTS} setup failures"
                 echo "Setup failures don't fail the pipeline - they indicate infrastructure issues"
+              elif [ "$TEST_FAILED" = "true" ]; then
+                echo "❌ Version compatibility tests failed (script execution error)"
+                exit 1
               else
                 echo "✅ Version compatibility tests completed successfully"
               fi
