@@ -10,10 +10,11 @@ USER root
 # python3-libs whose _hashlib needs OPENSSL_3.4.0, which the base's bundled
 # /usr/local/lib64/libcrypto.so.3 does not provide, crashing dnf mid-build.
 # Maven 3.9.6 supports Java 17.
+# Do not add `curl` here: the cp-kafka base ships curl-minimal (provides /usr/bin/curl),
+# and installing full curl conflicts with it, crashing dnf mid-build.
 RUN dnf install -y \
         java-11-openjdk-devel \
         wget \
-        curl \
         git && \
     dnf clean all && \
     wget --https-only https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
