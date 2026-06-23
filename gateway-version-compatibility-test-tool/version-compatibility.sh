@@ -194,8 +194,8 @@ run_compatibility_test() {
         return 1
     fi
 
-    # if kafka is not up, exit
-    KAFKA_READINESS_OUT=$(docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list 2>&1)
+    # if kafka is not up, exit — run inside kafka-server (correct JVM) not client
+    KAFKA_READINESS_OUT=$(docker-compose -f $COMPOSE_FILE exec -T kafka-server kafka-topics --bootstrap-server localhost:9092 --list 2>&1)
     if [ $? -ne 0 ]; then
         echo "❌ Kafka server not responding. Output:"
         echo "$KAFKA_READINESS_OUT"
