@@ -70,12 +70,16 @@ This starts three containers:
 
 ### Schemas and subjects
 
-The registration script creates **two distinct schemas**:
+The registration script creates these schemas:
 
 | Schema ID | Schema | Fields | Registered under subjects |
 |---|---|---|---|
 | **1** | `Order` | `order_id, product, quantity, price` | `orders-value`, `gov-id-value`, `gov-schema-value` |
 | **2** | `Event` | `event_id, kind` | `events-value` |
+| **3** | `Payment` | `payment_id, card_number (PII), amount` | `gov-encrypt-field-value` |
+| **4** | `Transaction` | `txn_id, account, amount` | `gov-encrypt-payload-value` |
+
+The `Payment` schema tags `card_number` with `confluent:tags: ["PII"]` and carries a data-contract **`ENCRYPT` rule** targeting that tag — see [Field-Level Encryption](#field-level-encryption-schema_rules) below. The `Transaction` schema carries an **`ENCRYPT_PAYLOAD` rule** that encrypts the whole record — see [Full-Payload Encryption](#full-payload-encryption-schema_rules) below.
 
 ### Topics and their validation levels
 
@@ -83,10 +87,11 @@ Topics are auto-created on first produce. Each is pinned to a validation level v
 
 | Topic | Validation level | Expected value subject | Conforming schema |
 |---|---|---|---|
-| `gov-none`   | `NONE`         | — | anything (no checks) |
-| `gov-id`     | `ID`           | `gov-id-value`     | `Order` (id 1) |
-| `gov-schema` | `SCHEMA`       | `gov-schema-value` | `Order` (id 1) |
-| `gov-rules`  | `SCHEMA_RULES` | `gov-rules-value`  | data-contract rules (incl. field-level encryption) |
+| `gov-none`         | `NONE`         | — | anything (no checks) |
+| `gov-id`           | `ID`           | `gov-id-value`           | `Order` (id 1) |
+| `gov-schema`       | `SCHEMA`       | `gov-schema-value`       | `Order` (id 1) |
+| `gov-encrypt-field`| `SCHEMA_RULES` | `gov-encrypt-field-value`| `Payment` (id 3) — `card_number` encrypted at the Gateway |
+| `gov-encrypt-payload`| `SCHEMA_RULES` | `gov-encrypt-payload-value`| `Transaction` (id 4) — whole record encrypted at the Gateway |
 
 ### What each validation level enforces
 
@@ -112,7 +117,7 @@ JAAS='org.apache.kafka.common.security.plain.PlainLoginModule required username=
 ```bash
 echo '{"order_id":"O1","product":"widget","quantity":2,"price":9.99}' | \
 docker exec -i schema-registry kafka-avro-console-producer \
-  --broker-list gateway:6969 --topic gov-schema \
+  --bootstrap-server gateway:6969 --topic gov-schema \
   --property schema.registry.url=http://schema-registry:8081 \
   --property value.schema.id=1 \
   --producer-property security.protocol=SASL_PLAINTEXT \
@@ -126,7 +131,7 @@ docker exec -i schema-registry kafka-avro-console-producer \
 ```bash
 echo "plain-text-no-schema-id" | \
 docker exec -i kafka kafka-console-producer \
-  --broker-list gateway:6969 --topic gov-id \
+  --bootstrap-server gateway:6969 --topic gov-id \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config="$JAAS"
@@ -140,7 +145,7 @@ Produce an `Event` record (id 2, registered only under `events-value`) to a topi
 ```bash
 echo '{"event_id":"E1","kind":"click"}' | \
 docker exec -i schema-registry kafka-avro-console-producer \
-  --broker-list gateway:6969 --topic gov-schema \
+  --bootstrap-server gateway:6969 --topic gov-schema \
   --property schema.registry.url=http://schema-registry:8081 \
   --property auto.register.schemas=false --property use.schema.id=2 --property value.schema.id=2 \
   --producer-property security.protocol=SASL_PLAINTEXT \
@@ -156,19 +161,107 @@ The same bytes — a valid id=1 prefix followed by non-Avro garbage — behave d
 ```bash
 # At ID level: ACCEPTED (payload not inspected)
 docker exec -i kafka bash -c "printf '\x00\x00\x00\x00\x01GARBAGE' | \
-  kafka-console-producer --broker-list gateway:6969 --topic gov-id \
+  kafka-console-producer --bootstrap-server gateway:6969 --topic gov-id \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config='$JAAS'"
 
 # At SCHEMA level: REJECTED — "Error deserializing Avro message ... id=1"
 docker exec -i kafka bash -c "printf '\x00\x00\x00\x00\x01GARBAGE' | \
-  kafka-console-producer --broker-list gateway:6969 --topic gov-schema \
+  kafka-console-producer --bootstrap-server gateway:6969 --topic gov-schema \
   --producer-property security.protocol=SASL_PLAINTEXT \
   --producer-property sasl.mechanism=PLAIN \
   --producer-property sasl.jaas.config='$JAAS'"
 ```
 This is the one test that distinguishes `ID` from `SCHEMA`: `ID` only checks the schema ID resolves; `SCHEMA` also deserializes the payload.
+
+### Field-Level Encryption (SCHEMA_RULES)
+
+At `SCHEMA_RULES` level the Gateway runs the schema's data-contract rules. The `Payment` schema (id 3) on `gov-encrypt-field` carries an `ENCRYPT` rule for its PII-tagged `card_number` field, so the **Gateway encrypts that field** before it reaches the broker — the producer sends plaintext and holds no key. This is *offloaded* encryption: the KMS secret lives only in the Gateway (`gateway.yaml` → `schemaRegistryConfigs`), not in any client.
+
+Because the client must send **plaintext** (the Gateway does the encrypting), the producer disables client-side rule execution with `rule.executors._default_.disabled=true`.
+
+> **Schema Registry setup:** storing data-contract rules and the data encryption keys requires SR to load two resource extensions (already set in `docker-compose.yaml`): `RuleSetResourceExtension` (persists the `ruleSet`) and `DekRegistryResourceExtension` (the DEK registry). Without the first, SR silently drops the `ruleSet` and no encryption happens.
+
+**Produce a `Payment` (client sends plaintext; Gateway encrypts `card_number`):**
+```bash
+echo '{"payment_id":"P1","card_number":"4111-2222-3333-4444","amount":42.5}' | \
+docker exec -i schema-registry kafka-avro-console-producer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-field \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property value.schema.id=3 --property auto.register.schemas=false \
+  --property rule.executors._default_.disabled=true \
+  --producer-property security.protocol=SASL_PLAINTEXT \
+  --producer-property sasl.mechanism=PLAIN \
+  --producer-property sasl.jaas.config="$JAAS"
+```
+
+**(a) Read the raw bytes straight from the broker (bypassing the Gateway) — `card_number` is ciphertext, `payment_id` stays plaintext:**
+```bash
+docker exec kafka kafka-console-consumer \
+  --bootstrap-server kafka:29092 --topic gov-encrypt-field --from-beginning --timeout-ms 6000 \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# e.g. ...P1<binary>Ln9rEaAQDjSwUtT6sEmQwgQw2XogpK8ADckjogUJhkIz...=  (card_number encrypted)
+```
+
+**(b) Read back through the Gateway — `card_number` is decrypted:**
+```bash
+docker exec schema-registry kafka-avro-console-consumer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-field --from-beginning \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property rule.executors._default_.disabled=true \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# {"payment_id":"P1","card_number":"4111-2222-3333-4444","amount":42.5}
+```
+
+Only `card_number` is encrypted (it's the only PII-tagged field); `payment_id` and `amount` stay in the clear.
+
+### Full-Payload Encryption (SCHEMA_RULES)
+
+Field-level encryption protects tagged fields. **Full-payload encryption** protects the *entire* record: the `Transaction` schema (id 4) on `gov-encrypt-payload` carries an `ENCRYPT_PAYLOAD` rule (an *encoding* rule, not a field rule), so the **Gateway encrypts the whole serialized value** before it reaches the broker. As with field-level encryption this is *offloaded* — the producer sends plaintext (`rule.executors._default_.disabled=true`) and holds no key.
+
+**Produce a `Transaction` (client sends plaintext; Gateway encrypts the whole record):**
+```bash
+echo '{"txn_id":"T1","account":"ACME-001","amount":9999.0}' | \
+docker exec -i schema-registry kafka-avro-console-producer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-payload \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property value.schema.id=4 --property auto.register.schemas=false \
+  --property rule.executors._default_.disabled=true \
+  --producer-property security.protocol=SASL_PLAINTEXT \
+  --producer-property sasl.mechanism=PLAIN \
+  --producer-property sasl.jaas.config="$JAAS"
+```
+
+**(a) Read the raw bytes straight from the broker (bypassing the Gateway) — the whole value is ciphertext (no field is readable):**
+```bash
+docker exec kafka kafka-console-consumer \
+  --bootstrap-server kafka:29092 --topic gov-encrypt-payload --from-beginning --timeout-ms 6000 \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# e.g. <schema-id prefix><binary ciphertext> — neither "T1" nor "ACME-001" appears
+```
+
+**(b) Read back through the Gateway — the record is decrypted:**
+```bash
+docker exec schema-registry kafka-avro-console-consumer \
+  --bootstrap-server gateway:6969 --topic gov-encrypt-payload --from-beginning \
+  --property schema.registry.url=http://schema-registry:8081 \
+  --property rule.executors._default_.disabled=true \
+  --consumer-property security.protocol=SASL_PLAINTEXT \
+  --consumer-property sasl.mechanism=PLAIN \
+  --consumer-property sasl.jaas.config="$JAAS"
+# {"txn_id":"T1","account":"ACME-001","amount":9999.0}
+```
+
+Unlike field-level encryption, **no field stays in the clear** — `txn_id`, `account`, and `amount` are all inside the encrypted payload.
+
+> **Field vs full-payload:** field-level (`ENCRYPT`) targets tagged fields and leaves the rest readable — good for selective PII protection while keeping the record partially queryable. Full-payload (`ENCRYPT_PAYLOAD`) encrypts everything — good when the whole record is sensitive.
 
 ### Verify — consume to confirm what landed
 
@@ -191,6 +284,8 @@ Only accepted records appear — rejected records never reached the broker.
 | 3 | `gov-schema` (SCHEMA) | `Event` id=2 (wrong subject) | rejected (`Failed to get schema ... id=2`) |
 | 4 | `gov-id` (ID) | id=1 prefix + garbage | accepted |
 | 4 | `gov-schema` (SCHEMA) | id=1 prefix + garbage | rejected (`Error deserializing Avro message`) |
+| 5 | `gov-encrypt-field` (SCHEMA_RULES) | `Payment` id=3 plaintext | accepted; `card_number` encrypted at rest, decrypted on read-back |
+| 6 | `gov-encrypt-payload` (SCHEMA_RULES) | `Transaction` id=4 plaintext | accepted; whole record encrypted at rest, decrypted on read-back |
 
 ## Gateway Configuration
 
@@ -202,6 +297,14 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID          # default for any topic not listed below
     valueSubjectNameStrategy: TOPIC   # subject = {topic}-value
+    # Local KMS secret so the Gateway can run encryption rules centrally
+    # (demo secret only — use a real KMS in production).
+    schemaRegistryConfigs:
+      rule.executors: "encryptField,encryptPayload"
+      rule.executors.encryptField.class: "io.confluent.kafka.schemaregistry.encryption.FieldEncryptionExecutor"
+      rule.executors.encryptField.param.secret: "<base64-local-kms-secret>"
+      rule.executors.encryptPayload.class: "io.confluent.kafka.schemaregistry.encryption.EncryptionExecutor"
+      rule.executors.encryptPayload.param.secret: "<base64-local-kms-secret>"
     topics:
       - name: gov-none
         valueValidationLevel: NONE
@@ -209,7 +312,9 @@ gateway:
         valueValidationLevel: ID
       - name: gov-schema
         valueValidationLevel: SCHEMA
-      - name: gov-rules
+      - name: gov-encrypt-field
+        valueValidationLevel: SCHEMA_RULES
+      - name: gov-encrypt-payload
         valueValidationLevel: SCHEMA_RULES
 ```
 
