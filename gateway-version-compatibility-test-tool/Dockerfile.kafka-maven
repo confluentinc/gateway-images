@@ -10,7 +10,7 @@ USER root
 # python3-libs whose _hashlib needs OPENSSL_3.4.0, which the base's bundled
 # /usr/local/lib64/libcrypto.so.3 does not provide, crashing dnf mid-build.
 # Maven 3.9.6 supports Java 17.
-RUN dnf install -y \
+RUN dnf install -y --allowerasing \
         java-11-openjdk-devel \
         wget \
         curl \
