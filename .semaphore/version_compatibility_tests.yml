@@ -17,6 +17,7 @@ global_job_config:
       - checkout
       - . vault-setup
       - . vault-sem-get-secret v1/ci/kv/cpc-gateway/slack-webhook-tests-notifications
+      - docker buildx inspect --bootstrap buildx-builder || docker buildx inspect --bootstrap
       - . assume-iam-role arn:aws:iam::523370736235:role/root-account-access
       - export RESULTS_TIMESTAMP=$(date +%Y-%m-%d-%H-%M-%S)
       - export S3_BUCKET="gateway-results"
