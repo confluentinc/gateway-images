@@ -98,8 +98,10 @@
                         <image>
                             <build>
                                 <args>
-                                    <UBI_MINIMAL_VERSION>${ubi9-minimal.image.version}</UBI_MINIMAL_VERSION>
-                                    <ARCH>${arch.type}</ARCH>
+                                    <APP_UID>${app.uid}</APP_UID>
+                                    <APP_GID>${app.gid}</APP_GID>
+                                    <UBI9_VERSION>${ubi9.image.version}</UBI9_VERSION>
+                                    <UBI_MICRO_VERSION>${ubi9-micro.image.version}</UBI_MICRO_VERSION>
                                     <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
                                     <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
                                     <TEMURIN_JDK_VERSION>-${ubi9-minimal.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
@@ -151,8 +153,13 @@
         the automation tooling can correctly identify and update them.
         -->
 
+        <!-- App User/Group IDs - can be overridden at build time via -Dapp.uid=<value> -Dapp.gid=<value> -->
+        <app.uid>1000</app.uid>
+        <app.gid>1000</app.gid>
+
         <!-- Base Image Versions -->
-        <ubi9-minimal.image.version>9.8-1781496742</ubi9-minimal.image.version>
+        <ubi9.image.version>9.7-1771346757</ubi9.image.version>
+        <ubi9-micro.image.version>9.7-1771346390</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
         <ubi9-minimal.temurin-21-jdk.version>21.0.11.0.0.10-0</ubi9-minimal.temurin-21-jdk.version>
