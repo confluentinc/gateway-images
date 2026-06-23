@@ -193,9 +193,20 @@ run_compatibility_test() {
         return 1
     fi
 
-    # if kafka is not up, exit
-    if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
+    # if kafka is not up, exit (output not suppressed, so the real error is visible)
+    echo "===> Broker connectivity check: kafka-topics --bootstrap-server kafka-server:9092 --list"
+    if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list; then
         echo "❌ Kafka server not responding. Exiting test."
+        echo "===== DIAGNOSTICS: broker unreachable from client ====="
+        echo "--- docker-compose ps ---"
+        docker-compose -f $COMPOSE_FILE ps || true
+        echo "--- client -> kafka-server DNS + TCP:9092 ---"
+        docker exec kafka-client-test bash -c 'getent hosts kafka-server || echo "DNS: kafka-server NOT resolvable"; (exec 3<>/dev/tcp/kafka-server/9092) 2>/dev/null && echo "TCP 9092: OPEN" || echo "TCP 9092: CLOSED"' || true
+        echo "--- kafka-server logs (tail 200) ---"
+        docker-compose -f $COMPOSE_FILE logs --tail=200 kafka-server || true
+        echo "--- gateway logs (tail 80) ---"
+        docker-compose -f $COMPOSE_FILE logs --tail=80 gateway || true
+        echo "======================================================="
         # Create status file to track the failure
         echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
