@@ -24,8 +24,10 @@ FROM docker.io/golang:${GOLANG_VERSION} AS build-utilities
 ARG CP_DOCKER_UTILS_VERSION
 
 ENV GO_BIN="/go/bin"
-RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/ub@${CP_DOCKER_UTILS_VERSION}
-RUN CGO_ENABLED=0 go install -ldflags="-w -s" github.com/confluentinc/cp-docker-utils/cmd/package_dedupe@${CP_DOCKER_UTILS_VERSION}
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" \
+    "github.com/confluentinc/cp-docker-utils/cmd/ub@${CP_DOCKER_UTILS_VERSION}"
+RUN CGO_ENABLED=0 go install -ldflags="-w -s" \
+    "github.com/confluentinc/cp-docker-utils/cmd/package_dedupe@${CP_DOCKER_UTILS_VERSION}"
 
 
 # Stage 2: Install packages to /microdir using full ubi9 with dnf
