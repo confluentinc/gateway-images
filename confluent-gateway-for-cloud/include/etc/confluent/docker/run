@@ -19,9 +19,25 @@ echo "===> Configuring Gateway..."
 # Run the configure script to validate environment
 /etc/confluent/docker/configure
 
+# Directory for runtime-generated config. configure exports this, but exports from a child process
+# do not persist, so resolve it again here with the same default.
+export GATEWAY_TMP_DIR="${GATEWAY_TMP_DIR:-/tmp/${COMPONENT}}"
+mkdir -p "${GATEWAY_TMP_DIR}" 2>/dev/null || true
+
+# Fail fast with a clear message when the generated-config directory is not writable (e.g. a
+# read-only root filesystem with no writable volume mounted here), instead of letting the app fail
+# later with a confusing "config file does not exist".
+if [ ! -w "${GATEWAY_TMP_DIR}" ]; then
+  echo "ERROR: Gateway generated-config directory '${GATEWAY_TMP_DIR}' is not writable." >&2
+  echo "       The entrypoint must write the runtime Gateway config here at startup. If the container" >&2
+  echo "       root filesystem is read-only (readOnlyRootFilesystem: true), mount a writable volume at" >&2
+  echo "       this path or set GATEWAY_TMP_DIR to a writable location." >&2
+  exit 1
+fi
+
 # exporting during configure does not persist, so we need to set it again
 if [ -z "$GATEWAY_CONFIG_FILE" ]; then
-  export GATEWAY_CONFIG_FILE="/etc/${COMPONENT}/gateway-config.yaml"
+  export GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
 fi
 
 if [ -z "$GATEWAY_LOG_REDACTOR_RULES" ] && [ -f "/etc/gateway/log-redactor-rules.json" ]; then
@@ -30,15 +46,15 @@ fi
 
 GATEWAY_START_ARGS=()
 
-if [ -f "/etc/${COMPONENT}/licenses.txt" ]; then
-  echo "===> Using licenses file at /etc/${COMPONENT}/licenses.txt"
-  GATEWAY_START_ARGS+=("-l" "/etc/${COMPONENT}/licenses.txt")
+if [ -f "${GATEWAY_TMP_DIR}/licenses.txt" ]; then
+  echo "===> Using licenses file at ${GATEWAY_TMP_DIR}/licenses.txt"
+  GATEWAY_START_ARGS+=("-l" "${GATEWAY_TMP_DIR}/licenses.txt")
 fi
 
 config_content=$(<"${GATEWAY_CONFIG_FILE}")
 
 # If GATEWAY_NODE_ID is defined and valid, replace $(gatewayNodeId)
-export GATEWAY_NODE_CONFIG_FILE="/etc/${COMPONENT}/gateway-node-config.yaml"
+export GATEWAY_NODE_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-node-config.yaml"
 if [[ -n "${GATEWAY_NODE_ID-}" && "${GATEWAY_NODE_ID}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
   echo "===> Replacing \$(gatewayNodeId) in configuration file with GATEWAY_NODE_ID: ${GATEWAY_NODE_ID}"
   config_content="${config_content//\$\(gatewayNodeId\)/${GATEWAY_NODE_ID}}"
@@ -49,6 +65,14 @@ if [[ -n "${GATEWAY_NODE_ID-}" && "${GATEWAY_NODE_ID}" =~ ^[a-zA-Z0-9_-]+$ ]]; t
   echo "${obfuscated_config_content}"
 else
   echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
+fi
+
+# Make sure the node config was actually written before starting the Gateway, so a write failure is
+# reported here clearly instead of as a confusing "config file does not exist" from the app.
+if [ ! -s "${GATEWAY_NODE_CONFIG_FILE}" ]; then
+  echo "ERROR: failed to write Gateway node config to '${GATEWAY_NODE_CONFIG_FILE}'." >&2
+  echo "       Ensure '${GATEWAY_TMP_DIR}' is writable (see the readOnlyRootFilesystem note above)." >&2
+  exit 1
 fi
 
 echo "GATEWAY_NODE_CONFIG_FILE: ${GATEWAY_NODE_CONFIG_FILE} will be used to start the Gateway."
