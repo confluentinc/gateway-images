@@ -105,6 +105,8 @@
                                     <GATEWAY_VERSION>${GATEWAY_VERSION}</GATEWAY_VERSION>
                                     <GOLANG_VERSION>${golang.image.version}</GOLANG_VERSION>
                                     <TEMURIN_JDK_VERSION>-${ubi9.temurin-21-jdk.version}</TEMURIN_JDK_VERSION>
+                                    <SHADOW_UTILS_VERSION>-${ubi9.shadow-utils.version}</SHADOW_UTILS_VERSION>
+                                    <SED_VERSION>-${ubi9.sed.version}</SED_VERSION>
                                     <CP_DOCKER_UTILS_VERSION>${git-repo.cp-docker-utils.tag}</CP_DOCKER_UTILS_VERSION>
                                 </args>
                             </build>
@@ -163,6 +165,8 @@
 
         <!-- OS Package Versions -->
         <ubi9.temurin-21-jdk.version>21.0.11.0.0.10-0</ubi9.temurin-21-jdk.version>
+        <ubi9.shadow-utils.version>4.9-16.el9</ubi9.shadow-utils.version>
+        <ubi9.sed.version>4.8-10.el9</ubi9.sed.version>
 
         <!-- GitHub Repository Tags -->
         <git-repo.cp-docker-utils.tag>v1.0.16</git-repo.cp-docker-utils.tag>
