@@ -74,7 +74,7 @@ services:
   #   - Fetches Kafka credentials from Vault for each authenticated client
   #   - swapConfig.clientAuth.connectionsMaxReAuthMs=5000 forces client re-auth every 5s
   gateway:
-    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
+    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:${GATEWAY_IMAGE_TAG:-latest}
     container_name: reauth-gateway
     depends_on:
       kafka-server:

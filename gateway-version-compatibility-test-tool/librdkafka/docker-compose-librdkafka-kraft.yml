@@ -48,7 +48,7 @@ services:
       start_period: 60s
 
   gateway:
-    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
+    image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:${GATEWAY_IMAGE_TAG:-latest}
     depends_on:
       kafka-server:
         condition: service_healthy
