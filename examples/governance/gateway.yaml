@@ -11,6 +11,17 @@ gateway:
     keyValidationLevel: NONE
     valueValidationLevel: ID
     valueSubjectNameStrategy: TOPIC
+    # Rule executors let the Gateway centrally encrypt data and enforce
+    # governance policies at SCHEMA_RULES level: encryptField for field-level
+    # ENCRYPT, encryptPayload for full-payload ENCRYPT_PAYLOAD. The local KMS
+    # secret is supplied here so the encryption runs at the Gateway.
+    # NOTE: demo secret only — supply via a real KMS / secret store in production.
+    schemaRegistryConfigs:
+      rule.executors: "encryptField,encryptPayload"
+      rule.executors.encryptField.class: "io.confluent.kafka.schemaregistry.encryption.FieldEncryptionExecutor"
+      rule.executors.encryptField.param.secret: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
+      rule.executors.encryptPayload.class: "io.confluent.kafka.schemaregistry.encryption.EncryptionExecutor"
+      rule.executors.encryptPayload.param.secret: "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
     # Per-topic overrides demonstrate each validation level on the same route.
     topics:
       - name: gov-none
@@ -19,7 +30,9 @@ gateway:
         valueValidationLevel: ID
       - name: gov-schema
         valueValidationLevel: SCHEMA
-      - name: gov-rules
+      - name: gov-encrypt-field
+        valueValidationLevel: SCHEMA_RULES
+      - name: gov-encrypt-payload
         valueValidationLevel: SCHEMA_RULES
 
   streamingDomains:
