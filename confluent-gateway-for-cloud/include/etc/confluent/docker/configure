@@ -24,20 +24,25 @@ mkdir -p "${GATEWAY_TMP_DIR}"
 
 ub path "${GATEWAY_TMP_DIR}" writable
 
-# Resolve the Gateway config file in priority order:
-#   1. GATEWAY_CONFIG_FILE  - use the file as-is (e.g. mounted by confluent-operator)
-#   2. GATEWAY_CONFIG       - inline config; write it to ${GATEWAY_TMP_DIR}/gateway-config.yaml
-#   3. GATEWAY_CONFIG_TEMPLATE - render the template to ${GATEWAY_TMP_DIR}/gateway-config.yaml
+# Materialize the resolved Gateway config into the writable runtime path. The Gateway overwrites
+# this file at runtime (via its config HTTP endpoint), so it must live in the writable
+# GATEWAY_TMP_DIR rather than on the read-only operator mount. The source is resolved in priority
+# order:
+#   1. GATEWAY_CONFIG_FILE     - copy the file (e.g. mounted read-only by confluent-operator)
+#   2. GATEWAY_CONFIG          - inline config; write it
+#   3. GATEWAY_CONFIG_TEMPLATE - render the template
+GATEWAY_RUNTIME_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
 if [[ -n "${GATEWAY_CONFIG_FILE-}" ]]; then
-  echo "===> Using GATEWAY_CONFIG_FILE environment variable: ${GATEWAY_CONFIG_FILE}"
+  echo "===> Copying GATEWAY_CONFIG_FILE (${GATEWAY_CONFIG_FILE}) to writable runtime path: ${GATEWAY_RUNTIME_CONFIG_FILE}"
+  if [[ "${GATEWAY_CONFIG_FILE}" != "${GATEWAY_RUNTIME_CONFIG_FILE}" ]]; then
+    cp "${GATEWAY_CONFIG_FILE}" "${GATEWAY_RUNTIME_CONFIG_FILE}"
+  fi
 elif [[ -n "${GATEWAY_CONFIG-}" ]]; then
   echo "===> Using GATEWAY_CONFIG environment variable"
-  GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
-  echo "${GATEWAY_CONFIG}" > "${GATEWAY_CONFIG_FILE}"
+  echo "${GATEWAY_CONFIG}" > "${GATEWAY_RUNTIME_CONFIG_FILE}"
 elif [[ -n "${GATEWAY_CONFIG_TEMPLATE-}" && -f "${GATEWAY_CONFIG_TEMPLATE}" ]]; then
   echo "===> Templating configuration file from GATEWAY_CONFIG_TEMPLATE"
-  GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
-  ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
+  ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_RUNTIME_CONFIG_FILE}"
 else
   echo "ERROR: No Gateway config provided. Set one of GATEWAY_CONFIG_FILE, GATEWAY_CONFIG, or GATEWAY_CONFIG_TEMPLATE." >&2
   exit 1
