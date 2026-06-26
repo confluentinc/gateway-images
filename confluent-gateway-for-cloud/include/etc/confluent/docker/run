@@ -21,23 +21,38 @@ echo "===> Configuring Gateway..."
 
 # Directory for runtime-generated config. configure exports this, but exports from a child process
 # do not persist, so resolve it again here with the same default.
-export GATEWAY_TMP_DIR="${GATEWAY_TMP_DIR:-/tmp/${COMPONENT}}"
+GATEWAY_TMP_DIR="${GATEWAY_TMP_DIR:-/tmp/${COMPONENT}}"
 mkdir -p "${GATEWAY_TMP_DIR}" 2>/dev/null || true
 
 # Fail fast with a clear message when the generated-config directory is not writable (e.g. a
 # read-only root filesystem with no writable volume mounted here), instead of letting the app fail
 # later with a confusing "config file does not exist".
 if [ ! -w "${GATEWAY_TMP_DIR}" ]; then
-  echo "ERROR: Gateway generated-config directory '${GATEWAY_TMP_DIR}' is not writable." >&2
+  echo "ERROR: Gateway config directory '${GATEWAY_TMP_DIR}' is not writable." >&2
   echo "       The entrypoint must write the runtime Gateway config here at startup. If the container" >&2
   echo "       root filesystem is read-only (readOnlyRootFilesystem: true), mount a writable volume at" >&2
   echo "       this path or set GATEWAY_TMP_DIR to a writable location." >&2
   exit 1
 fi
 
-# exporting during configure does not persist, so we need to set it again
+# Point the JVM temp dir at the writable generated-config directory. The Gateway writes its
+# generated runtime config under java.io.tmpdir; without this it would default to /tmp, which is
+# not writable under readOnlyRootFilesystem: true.
+export GATEWAY_OPTS="${GATEWAY_OPTS:-} -Djava.io.tmpdir=${GATEWAY_TMP_DIR}"
+
+# configure runs as a child process, so the variables it exports do not propagate back to run.
+# The contract between configure and run is the file at a well-known path, not the environment:
+# configure writes the resolved config to ${GATEWAY_TMP_DIR}/gateway-config.yaml, and run defaults
+# to that same path here. GATEWAY_CONFIG_FILE is non-empty in our env only when it is a real
+# container env var (e.g. mounted by confluent-operator), which both scripts see directly.
 if [ -z "$GATEWAY_CONFIG_FILE" ]; then
-  export GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
+  GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
+fi
+
+if [ ! -f "$GATEWAY_CONFIG_FILE" ]; then
+  echo "ERROR: Gateway config file '${GATEWAY_CONFIG_FILE}' does not exist. Provide one of" >&2
+  echo "       GATEWAY_CONFIG_FILE, GATEWAY_CONFIG, or GATEWAY_CONFIG_TEMPLATE (see configure)." >&2
+  exit 1
 fi
 
 if [ -z "$GATEWAY_LOG_REDACTOR_RULES" ] && [ -f "/etc/gateway/log-redactor-rules.json" ]; then
@@ -51,31 +66,11 @@ if [ -f "${GATEWAY_TMP_DIR}/licenses.txt" ]; then
   GATEWAY_START_ARGS+=("-l" "${GATEWAY_TMP_DIR}/licenses.txt")
 fi
 
-config_content=$(<"${GATEWAY_CONFIG_FILE}")
-
-# If GATEWAY_NODE_ID is defined and valid, replace $(gatewayNodeId)
-export GATEWAY_NODE_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-node-config.yaml"
-if [[ -n "${GATEWAY_NODE_ID-}" && "${GATEWAY_NODE_ID}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-  echo "===> Replacing \$(gatewayNodeId) in configuration file with GATEWAY_NODE_ID: ${GATEWAY_NODE_ID}"
-  config_content="${config_content//\$\(gatewayNodeId\)/${GATEWAY_NODE_ID}}"
-  echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
-  echo "Updated configuration content: (saved to ${GATEWAY_NODE_CONFIG_FILE}):"
-  # obfuscate any sensitive information in the configuration content before printing
-  obfuscated_config_content=$(echo "${config_content}" | sed -E 's/(password|secret|key|token|value)[=:][^,]+/\1=****/gi')
-  echo "${obfuscated_config_content}"
-else
-  echo "${config_content}" > "${GATEWAY_NODE_CONFIG_FILE}"
+if [ -n "$GATEWAY_NODE_ID" ]; then
+  echo "===> Using GATEWAY_NODE_ID: ${GATEWAY_NODE_ID}"
+  GATEWAY_START_ARGS+=("-n" "${GATEWAY_NODE_ID}")
 fi
 
-# Make sure the node config was actually written before starting the Gateway, so a write failure is
-# reported here clearly instead of as a confusing "config file does not exist" from the app.
-if [ ! -s "${GATEWAY_NODE_CONFIG_FILE}" ]; then
-  echo "ERROR: failed to write Gateway node config to '${GATEWAY_NODE_CONFIG_FILE}'." >&2
-  echo "       Ensure '${GATEWAY_TMP_DIR}' is writable (see the readOnlyRootFilesystem note above)." >&2
-  exit 1
-fi
-
-echo "GATEWAY_NODE_CONFIG_FILE: ${GATEWAY_NODE_CONFIG_FILE} will be used to start the Gateway."
 echo "${GATEWAY_START_ARGS[@]}"
 
-/usr/bin/gateway-start -c "$GATEWAY_NODE_CONFIG_FILE" "${GATEWAY_START_ARGS[@]}" "$@"
+/usr/bin/gateway-start -c "$GATEWAY_CONFIG_FILE" "${GATEWAY_START_ARGS[@]}" "$@"
