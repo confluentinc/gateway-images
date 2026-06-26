@@ -37,7 +37,6 @@ ARG APP_UID
 ARG APP_GID
 ARG TEMURIN_JDK_VERSION
 ARG SHADOW_UTILS_VERSION
-ARG SED_VERSION
 ARG GATEWAY_VERSION
 ARG CONFLUENT_PACKAGES_REPO
 ARG ARTIFACT_ID
@@ -66,7 +65,6 @@ RUN echo "===> Installing Temurin JRE and Gateway..." \
        "temurin-21-jre${TEMURIN_JDK_VERSION}" \
        "confluent-gateway-${GATEWAY_VERSION}" \
        "shadow-utils${SHADOW_UTILS_VERSION}" \
-       "sed${SED_VERSION}" \
     && echo "===> Cleaning up ..." \
     && dnf --installroot=/microdir clean all \
     && rm -rf /microdir/var/cache/* /microdir/var/log/dnf* /microdir/var/log/yum.* /microdir/tmp/* \
