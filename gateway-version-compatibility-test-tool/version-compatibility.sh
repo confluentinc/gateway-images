@@ -3,6 +3,17 @@
 # 16 combinations: Java clients only (4×4 matrix)
 
 GATEWAY_METRICS="http://localhost:9190/metrics"
+
+# Wait for the gateway admin endpoint to respond. The ubi9-micro gateway image
+# ships without curl, so readiness is polled from the host (which has curl)
+# instead of via an in-container Docker healthcheck.
+wait_for_gateway() {
+    for _ in $(seq 1 30); do
+        curl -sf "$GATEWAY_METRICS" > /dev/null 2>&1 && return 0
+        sleep 2
+    done
+    return 1
+}
 RESULTS_DIR="compatibility-results/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
@@ -169,11 +180,13 @@ run_compatibility_test() {
         fi
     fi
     
-    # Health checks will ensure services are ready
-    echo "Services started with health checks - verifying final connectivity..."
-    if ! curl -s "$GATEWAY_METRICS" > /dev/null; then
+    # The ubi9-micro gateway image has no in-container curl, so gateway readiness
+    # is polled from the host instead of via a Docker healthcheck.
+    echo "Waiting for gateway to become ready..."
+    if ! wait_for_gateway; then
         echo "❌ Gateway not responding. Exiting test."
-        # Create status file to track the failure
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
         echo "SETUP_FAILED: Gateway not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: GATEWAY_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -181,10 +194,13 @@ run_compatibility_test() {
         return 1
     fi
 
-    # if kafka is not up, exit
-    if ! docker exec kafka-client-test kafka-topics --bootstrap-server kafka-server:9092 --list > /dev/null 2>&1; then
-        echo "❌ Kafka server not responding. Exiting test."
-        # Create status file to track the failure
+    # if kafka is not up, exit — run inside kafka-server (correct JVM) not client
+    KAFKA_READINESS_OUT=$(docker-compose -f $COMPOSE_FILE exec -T kafka-server kafka-topics --bootstrap-server localhost:9092 --list 2>&1)
+    if [[ $? -ne 0 ]]; then
+        echo "❌ Kafka server not responding. Output:"
+        echo "$KAFKA_READINESS_OUT"
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
         echo "SETUP_FAILED: Kafka server not responding" > "$RESULTS_DIR/${test_id}_status.txt"
         echo "FAILURE_TYPE: KAFKA_NOT_RESPONDING" >> "$RESULTS_DIR/${test_id}_status.txt"
         echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
@@ -215,7 +231,8 @@ run_compatibility_test() {
     # Determine Java version and Maven settings based on Kafka client version
     java_settings=""
     if [[ "$client_ver" == "8.0.0" ]]; then
-        java_settings="export JAVA_HOME=/usr/lib/jvm/java-11-zulu-openjdk-ca && export PATH=\$JAVA_HOME/bin:\$PATH && "
+        # Dockerfile sets JAVA_HOME=/usr/lib/jvm/java-11-openjdk (Red Hat OpenJDK);
+        # don't override it — the Zulu path no longer exists in this image.
         maven_java_args="-Dmaven.compiler.source=11 -Dmaven.compiler.target=11"
         echo "🔧 Using Java 11 for Kafka client $client_ver (required for 8.0.0+)"
     else
@@ -333,6 +350,12 @@ run_compatibility_test() {
     else
         echo "❌ JUnit tests failed for client $client_ver with server $server_ver"
         echo "   Check JUnit XML reports at: $JUNIT_RESULTS_DIR"
+        echo "--- Container logs ---"
+        docker-compose -f $COMPOSE_FILE logs --no-color --tail=50
+        echo "FAILED: JUnit tests failed" > "$RESULTS_DIR/${test_id}_status.txt"
+        echo "FAILURE_TYPE: JUNIT_FAILED" >> "$RESULTS_DIR/${test_id}_status.txt"
+        echo "TIMESTAMP: $(date -Iseconds)" >> "$RESULTS_DIR/${test_id}_status.txt"
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
     
@@ -351,8 +374,8 @@ run_compatibility_test() {
     curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
     
     # Cleanup
-    docker-compose -f docker-compose.yml down
-    
+    docker-compose -f $COMPOSE_FILE down
+
     echo "Completed: $test_id"
 }
 
@@ -411,17 +434,18 @@ main() {
     
     local test_count=0
     local total_tests=$total_combinations
+    local overall_failed=0
 
     # start timer
     CURRENT_TIME=$(date +%s)
-    
+
     # Run all combinations
     for client_ver in "${CLIENTS[@]}"; do
         for server_ver in "${SERVERS[@]}"; do
             test_count=$((test_count + 1))
             echo "[$test_count/$total_tests] Testing combination..."
-            run_compatibility_test $client_ver $server_ver
-            
+            run_compatibility_test $client_ver $server_ver || overall_failed=1
+
             # Brief pause between tests
             sleep 3
         done
@@ -432,9 +456,10 @@ main() {
     ELAPSED_TIME=$((END_TIME - CURRENT_TIME))
     echo ""
     echo "Total testing time: $ELAPSED_TIME seconds"
-    
+
     # Generate final reports
     generate_final_report
+    return $overall_failed
 }
 
 # Usage
@@ -450,10 +475,12 @@ case "$1" in
         fi
         setup_python_env  # Set up Python environment before running tests
         run_compatibility_test $2 $3
+        SINGLE_RC=$?
         # Generate report for single test
         source venv/bin/activate
         python3 enhanced_metrics_parser.py "$RESULTS_DIR"
         deactivate
+        exit $SINGLE_RC
         ;;
     "--parse")
         if [ $# -ne 2 ]; then

@@ -7,3 +7,6 @@ compatibility-results/
 __pycache__/
 .venv/
 venv/
+
+# Local Confluent license for the governance example
+examples/governance/.env

@@ -47,6 +47,11 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_MIN_INSYNC_REPLICAS: 1
 
+      # Confluent enterprise topics default to RF=3; must override for single-broker
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_COMMAND_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_CLUSTER_LINK_METADATA_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_BALANCER_TOPIC_REPLICATION_FACTOR: 1
 
       KAFKA_SUPER_USERS: User:ANONYMOUS
     healthcheck:
@@ -156,12 +161,6 @@ services:
               metrics: true
           advanced:
             useIoUring: false
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9190/metrics || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
   kafka-client-test:
     build:
       context: .
@@ -170,7 +169,7 @@ services:
         KAFKA_VERSION: ${KAFKA_CLIENT_VERSION}
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     container_name: kafka-client-test
     volumes:
       - ./ssl:/etc/kafka/secrets

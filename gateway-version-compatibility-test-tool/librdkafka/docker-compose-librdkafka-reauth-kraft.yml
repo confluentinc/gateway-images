@@ -142,12 +142,6 @@ services:
                         file: /etc/gateway/config/jaas-gw-swapping.conf
           advanced:
             useIoUring: false
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:9190/metrics || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
 
   librdkafka-client-test:
     build:
@@ -157,7 +151,7 @@ services:
         LIBRDKAFKA_VERSION: ${LIBRDKAFKA_CLIENT_VERSION:-2.13.0}
     depends_on:
       gateway:
-        condition: service_healthy
+        condition: service_started
     container_name: librdkafka-client-test
     volumes:
       - ../configs:/mutable-configs

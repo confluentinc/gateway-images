@@ -62,7 +62,7 @@ enabled=1 " > /etc/yum.repos.d/confluent.repo \
 
 RUN echo "===> Installing Temurin JRE and Gateway..." \
     && dnf install -y --installroot=/microdir --releasever=9 --setopt=install_weak_deps=False --nodocs \
-       "temurin-21-jre${TEMURIN_JDK_VERSION}" \
+       "temurin-25-jre${TEMURIN_JDK_VERSION}" \
        "confluent-gateway-${GATEWAY_VERSION}" \
        "shadow-utils${SHADOW_UTILS_VERSION}" \
     && echo "===> Cleaning up ..." \
