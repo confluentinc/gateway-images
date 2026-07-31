@@ -49,7 +49,7 @@
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
-                <version>8.1.0</version>
+                <version>8.3.1</version>
             </dependency>
 
             <dependency>
@@ -159,11 +159,11 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1784004572</ubi9.image.version>
-        <ubi9-micro.image.version>9.8-1782840931</ubi9-micro.image.version>
+        <ubi9.image.version>9.8-1785388874</ubi9.image.version>
+        <ubi9-micro.image.version>9.8-1784702951</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
-        <ubi9.temurin-21-jdk.version>21.0.11.0.0.10-0</ubi9.temurin-21-jdk.version>
+        <ubi9.temurin-21-jdk.version>21.0.12.0.0.8-0</ubi9.temurin-21-jdk.version>
         <ubi9.shadow-utils.version>4.9-16.el9</ubi9.shadow-utils.version>
 
         <!-- GitHub Repository Tags -->
