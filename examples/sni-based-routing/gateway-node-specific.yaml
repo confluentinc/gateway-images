@@ -1,0 +1,48 @@
+# Gateway configuration example using BROKER-SPECIFIC certificates
+# This configuration uses individual certificates for each broker on each node
+# Each node must have its own certificate files generated with CERT_APPROACH=broker-specific
+#
+# Usage:
+# 1. Generate certificates: export CERT_APPROACH=broker-specific GATEWAY_NODE_ID=gw-0 MAX_KAFKA_BROKERS=3 && ./generate-ssl.sh
+# 2. Start gateway: export GATEWAY_NODE_ID=gw-0 && gateway start
+#
+# The $(gatewayNodeId) placeholder will be replaced with the GATEWAY_NODE_ID value
+gateway:
+  admin:
+    endpoints:
+      metrics: true
+  streamingDomains:
+    - name: sample-domain
+      type: kafka
+      kafkaCluster:
+        name: kafka-cluster-1
+        bootstrapServers:
+          - id: localkafka
+            endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint
+  routes:
+    - name: sni-route
+      endpoint: "kafka.gateway.local:19092"
+      brokerIdentificationStrategy:
+        type: host
+        # Broker-specific certificate must match this exact pattern for each broker
+        # Example: b0.gw-0.kafka.gateway.local, b1.gw-0.kafka.gateway.local
+        pattern: "b$(nodeId).$(gatewayNodeId).kafka.gateway.local"
+      streamingDomain:
+        name: sample-domain
+        bootstrapServerId: localkafka
+      security:
+        auth: passthrough
+        ssl:
+          truststore:
+            # Node-specific truststore (same CA, can be shared)
+            location: /etc/gateway/$(gatewayNodeId).truststore.jks
+            password:
+              file: /etc/gateway/$(gatewayNodeId).truststore.pwd
+          keystore:
+            # Node-specific keystore with certificates for this specific node
+            location: /etc/gateway/$(gatewayNodeId).keystore.jks
+            password:
+              file: /etc/gateway/$(gatewayNodeId).keystore.pwd
+            keyPassword:
+              file: /etc/gateway/$(gatewayNodeId).key.pwd
+          clientAuth: required
