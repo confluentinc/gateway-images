@@ -130,9 +130,20 @@ blocks:
               done
               curl -sf http://localhost:9190/livez || { echo "gateway never became healthy"; exit 1; }
             - docker logs gateway 2>&1 | grep -i "Platform:" || true
+            # /livez is liveness only - there is no readiness endpoint (/readyz 404s) - so
+            # a client connecting the instant it flips can still hit "terminated during
+            # authentication" retries while the upstream connection settles. The client
+            # recovers on its own, but a short settle keeps the log clean and stops this
+            # being an intermittent gate failure.
+            - sleep 15
             # The client runs in a native s390x cp-server container on the host network so
             # it reaches the gateway's advertised localhost:19092 route the same way an
             # external client would. Credentials come from the example's own properties.
+            #
+            # Use --command-config, NOT --producer.config / --consumer.config: those are
+            # deprecated, and kafka-console-consumer prints its deprecation notice to
+            # STDOUT, which lands in got.txt and breaks the byte-identical comparison
+            # below with a spurious first line.
             - |
               set -e
               printf 'native-s390x-msg-%d\n' 1 2 3 4 5 > /tmp/sent.txt
@@ -141,13 +152,13 @@ blocks:
                 -v /tmp/sent.txt:/tmp/sent.txt:ro \
                 confluentinc/cp-server:latest \
                 bash -c "kafka-console-producer --bootstrap-server localhost:19092 \
-                  --producer.config /tmp/client.properties --topic s390x-native-cert < /tmp/sent.txt"
+                  --command-config /tmp/client.properties --topic s390x-native-cert < /tmp/sent.txt"
               sleep 5
               docker run --rm --network host \
                 -v "$COMPOSE_DIR/client_sasl.properties":/tmp/client.properties:ro \
                 confluentinc/cp-server:latest \
                 bash -c "kafka-console-consumer --bootstrap-server localhost:19092 \
-                  --consumer.config /tmp/client.properties --topic s390x-native-cert \
+                  --command-config /tmp/client.properties --topic s390x-native-cert \
                   --from-beginning --max-messages 5 --timeout-ms 60000" > /tmp/got.txt
               echo "--- sent ---";     cat /tmp/sent.txt
               echo "--- received ---"; cat /tmp/got.txt
