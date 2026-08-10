@@ -1,0 +1,187 @@
+# Native s390x validation for the Gateway docker image (CPCG-541 / CPCG-517).
+#
+# Runs the existing sanity test plus a Kafka produce/consume round-trip against the
+# s390x image on a real IBM Z agent, rather than under QEMU emulation. Both the gateway
+# and cp-server resolve to their native s390x variants here, so the proxy and the broker
+# are both running on big-endian hardware with no emulator in the path.
+#
+# Reached as a MANUAL promotion from cp_dockerfile_build.yml, so it validates the dev
+# ECR image that build just pushed - i.e. before promotion to Docker Hub.
+#
+# WHY THIS IS A SEPARATE PIPELINE FILE, and not a block in cp_dockerfile_build.yml:
+# that file declares `. vault-setup` in its global_job_config.prologue, which every job
+# inherits and no block can opt out of. Vault V3 is not reachable from the s390x pool
+# (DP-19746, in review), so a block placed there fails in the prologue before it runs.
+# Vault is the ONLY remaining reason for the split - once DP-19746 lands, this can move
+# inline and become a real gate. Everything else the s390x pool was once missing now
+# works, so do not re-derive those limitations from the older Confluence pages:
+#   * Docker Compose v2  -> installed, v2.29.2 CLI plugin (DP-19431)
+#   * Docker Hub creds   -> $DOCKERHUB_USER / $DOCKERHUB_APIKEY injected by the agent
+#                           pre-job hook from SSM, no Vault involved
+#   * prod ECR           -> reachable via the ECR credential helper (DP-19453)
+#   * mise / sem-version -> installed (DP-19391)
+# Note the capability page for the *validation* pool (s1-validation-ubuntu-24-s390x-4)
+# does not describe this pool; that pool is being decommissioned (DP-19905).
+#
+# Operational notes:
+#   * The s390x pool is small and jobs can queue for a long time (CPBR-3953), which is
+#     why this is one block with one job: the agent is acquired exactly once.
+#   * There is no SSH debug on s390x agents (DP-19328), so the epilogue always uploads
+#     container logs and metrics as artifacts. That is the only debugging channel.
+
+version: v1.0
+name: s390x-native-validation
+agent:
+  machine:
+    type: s1-ubuntu-24-s390x-4
+
+execution_time_limit:
+  hours: 1
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      # Deliberately NO `. vault-setup` - see header.
+      - '[[ -z $DOCKERHUB_APIKEY ]] || docker login --username $DOCKERHUB_USER --password $DOCKERHUB_APIKEY'
+      # Promotions stay in the parent workflow, so SEMAPHORE_* is inherited and the dev
+      # image tag can be recomputed here exactly as cp_dockerfile_build.yml derives it.
+      - export BRANCH_TAG=$(echo $SEMAPHORE_GIT_BRANCH | tr / -)
+      - export BUILD_NUMBER=$(echo $SEMAPHORE_WORKFLOW_ID | cut -f1 -d"-")
+      - export DOCKER_DEV_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
+      # GATEWAY_IMAGE is overridable so this same pipeline can validate a published
+      # Docker Hub tag (e.g. confluentinc/cpc-gateway:1.3.0) when run outside a build.
+      - export GATEWAY_IMAGE="${GATEWAY_IMAGE:-${DOCKER_DEV_REGISTRY}confluentinc/cpc-gateway:dev-$BRANCH_TAG-$BUILD_NUMBER-ubi9.s390x}"
+      # Absolute paths: the epilogue shares this job's shell session, so by the time it
+      # runs the cwd is already inside COMPOSE_DIR and a relative cd would fail.
+      - export REPO_ROOT="$PWD"
+      - export COMPOSE_DIR="$PWD/examples/simple-passthrough-example"
+      - echo "Validating $GATEWAY_IMAGE on $(uname -m)"
+
+blocks:
+  - name: Native s390x validation
+    dependencies: []
+    task:
+      jobs:
+        - name: Sanity + produce/consume on native s390x
+          commands:
+            # ---- Preflight -----------------------------------------------------------
+            # Kept in this job rather than a separate block so the scarce s390x agent is
+            # acquired once instead of queueing twice.
+            - |
+              ARCH=$(uname -m)
+              if [ "$ARCH" != "s390x" ]; then
+                echo "FATAL: expected an s390x agent, got '$ARCH'."
+                echo "A green run on the wrong architecture would prove nothing. Check"
+                echo "agent.machine.type is s1-ubuntu-24-s390x-4."
+                exit 1
+              fi
+              echo "Agent architecture: $ARCH"
+            - docker version
+            - lscpu | grep -iE "architecture|byte order|machine type" || true
+            # Known-present (DP-19431), but assert it rather than fail obscurely inside
+            # sanity-test.sh, which drives `docker compose`.
+            - |
+              if docker compose version; then
+                echo "Compose v2 plugin OK"
+              else
+                echo "FATAL: 'docker compose' (v2 plugin) did not resolve on this agent."
+                echo "It is installed by ci-build-agent-infra"
+                echo "packer/s390x/scripts/install-toolchain.sh - check that, not apt."
+                exit 1
+              fi
+            # Pull both sides of the test and confirm each is really s390x.
+            - |
+              for IMG in "$GATEWAY_IMAGE" confluentinc/cp-server:latest; do
+                echo "--- $IMG"
+                docker pull "$IMG"
+                # An empty .Architecture means the containerd image store returned the
+                # multi-arch index rather than a platform manifest - inconclusive, not a
+                # failure. Ask the image itself in that case, and only fail on a real
+                # mismatch.
+                ACT=$(docker image inspect "$IMG" --format '{{.Architecture}}' 2>/dev/null || true)
+                if [ -z "$ACT" ]; then
+                  ACT=$(docker run --rm --entrypoint /bin/uname "$IMG" -m 2>/dev/null || true)
+                fi
+                if [ -z "$ACT" ]; then
+                  echo "WARN: could not determine architecture of $IMG; the agent is"
+                  echo "      s390x so docker will have resolved the s390x variant."
+                elif [ "$ACT" != "s390x" ]; then
+                  echo "FATAL: $IMG resolved to '$ACT', expected s390x."
+                  exit 1
+                else
+                  echo "$IMG -> $ACT OK"
+                fi
+              done
+
+            # ---- Phase 1: the same sanity test the AMD and ARM blocks run -------------
+            # Reused unchanged; it is `docker compose` (v2) throughout. Note it tears the
+            # stack down on exit, so phase 2 brings up its own.
+            - ./scripts/sanity-test.sh "$GATEWAY_IMAGE" 300
+
+            # ---- Phase 2: real Kafka traffic through the gateway ----------------------
+            - cd "$COMPOSE_DIR"
+            - export KAFKA_SERVER_JAAS_CONF="$COMPOSE_DIR/kafka_server_jaas.conf"
+            - docker compose up -d
+            - |
+              for i in $(seq 1 120); do
+                curl -sf http://localhost:9190/livez >/dev/null 2>&1 && break
+                sleep 2
+              done
+              curl -sf http://localhost:9190/livez || { echo "gateway never became healthy"; exit 1; }
+            - docker logs gateway 2>&1 | grep -i "Platform:" || true
+            # The client runs in a native s390x cp-server container on the host network so
+            # it reaches the gateway's advertised localhost:19092 route the same way an
+            # external client would. Credentials come from the example's own properties.
+            - |
+              set -e
+              printf 'native-s390x-msg-%d\n' 1 2 3 4 5 > /tmp/sent.txt
+              docker run --rm --network host \
+                -v "$COMPOSE_DIR/client_sasl.properties":/tmp/client.properties:ro \
+                -v /tmp/sent.txt:/tmp/sent.txt:ro \
+                confluentinc/cp-server:latest \
+                bash -c "kafka-console-producer --bootstrap-server localhost:19092 \
+                  --producer.config /tmp/client.properties --topic s390x-native-cert < /tmp/sent.txt"
+              sleep 5
+              docker run --rm --network host \
+                -v "$COMPOSE_DIR/client_sasl.properties":/tmp/client.properties:ro \
+                confluentinc/cp-server:latest \
+                bash -c "kafka-console-consumer --bootstrap-server localhost:19092 \
+                  --consumer.config /tmp/client.properties --topic s390x-native-cert \
+                  --from-beginning --max-messages 5 --timeout-ms 60000" > /tmp/got.txt
+              echo "--- sent ---";     cat /tmp/sent.txt
+              echo "--- received ---"; cat /tmp/got.txt
+              if diff -q /tmp/sent.txt /tmp/got.txt >/dev/null; then
+                echo "PASS: produce/consume round-trip byte-identical on native s390x"
+              else
+                echo "FAIL: payload mismatch through the gateway"
+                diff /tmp/sent.txt /tmp/got.txt || true
+                exit 1
+              fi
+            # Prove the gateway decoded and proxied the traffic rather than the client
+            # having somehow reached the broker directly.
+            - |
+              echo "--- proxied request counters ---"
+              curl -s http://localhost:9190/metrics \
+                | grep -E "kroxylicious_client_to_proxy_request_total" | awk '$NF+0>0' || true
+              echo "--- error counters (expect 0) ---"
+              curl -s http://localhost:9190/metrics | grep -E "errors_total\{" || true
+            - |
+              if docker logs gateway 2>&1 \
+                 | grep -iE "UnsatisfiedLinkError|SIGILL|SIGSEGV|OutOfMemoryError" \
+                 | grep -v "ExitOnOutOfMemoryError"; then
+                echo "FAIL: gateway logged a native or fatal error on s390x"
+                exit 1
+              fi
+              echo "No native or fatal errors in gateway log."
+      epilogue:
+        always:
+          commands:
+            # Only debugging channel available - no SSH debug on this pool (DP-19328).
+            - mkdir -p /tmp/s390x-logs
+            - docker logs gateway > /tmp/s390x-logs/gateway.log 2>&1 || true
+            - docker logs kafka-1 > /tmp/s390x-logs/kafka-1.log 2>&1 || true
+            - curl -s http://localhost:9190/metrics > /tmp/s390x-logs/metrics.txt 2>/dev/null || true
+            - docker compose -f "$COMPOSE_DIR/docker-compose.yaml" logs > /tmp/s390x-logs/compose.log 2>&1 || true
+            - artifact push job /tmp/s390x-logs --destination s390x-native-validation || true
+            - docker compose -f "$COMPOSE_DIR/docker-compose.yaml" down -v || true
