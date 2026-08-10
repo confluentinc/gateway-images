@@ -159,8 +159,8 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1785906690</ubi9.image.version>
-        <ubi9-micro.image.version>9.8-1784702951</ubi9-micro.image.version>
+        <ubi9.image.version>9.8-1786339177</ubi9.image.version>
+        <ubi9-micro.image.version>9.8-1786321990</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
         <ubi9.temurin-25-jdk.version>25.0.4.0.0.7-0</ubi9.temurin-25-jdk.version>
