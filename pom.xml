@@ -159,7 +159,7 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1786339177</ubi9.image.version>
+        <ubi9.image.version>9.8-1786416589</ubi9.image.version>
         <ubi9-micro.image.version>9.8-1786321990</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
