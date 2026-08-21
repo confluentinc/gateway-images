@@ -163,7 +163,7 @@
         <ubi9-micro.image.version>9.8-1786321990</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
-        <ubi9.temurin-25-jdk.version>25.0.4.0.0.7-0</ubi9.temurin-25-jdk.version>
+        <ubi9.temurin-25-jdk.version>25.0.4.1.0.1-0</ubi9.temurin-25-jdk.version>
         <ubi9.shadow-utils.version>4.9-16.el9</ubi9.shadow-utils.version>
 
         <!-- GitHub Repository Tags -->
