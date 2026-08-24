@@ -159,7 +159,7 @@
         <ubi9-minimal.image.version>9.8-1786987521</ubi9-minimal.image.version>
 
         <!-- OS Package Versions -->
-        <ubi9-minimal.temurin-21-jdk.version>21.0.12.0.0.8-0</ubi9-minimal.temurin-21-jdk.version>
+        <ubi9-minimal.temurin-21-jdk.version>21.0.12.1.0.1-0</ubi9-minimal.temurin-21-jdk.version>
 
         <!-- GitHub Repository Tags -->
         <git-repo.cp-docker-utils.tag>v1.0.17</git-repo.cp-docker-utils.tag>
