@@ -159,11 +159,11 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1786985871</ubi9.image.version>
+        <ubi9.image.version>9.8-1787634763</ubi9.image.version>
         <ubi9-micro.image.version>9.8-1786321990</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
-        <ubi9.temurin-21-jdk.version>21.0.12.0.0.8-0</ubi9.temurin-21-jdk.version>
+        <ubi9.temurin-21-jdk.version>21.0.12.1.0.1-0</ubi9.temurin-21-jdk.version>
         <ubi9.shadow-utils.version>4.9-16.el9</ubi9.shadow-utils.version>
 
         <!-- GitHub Repository Tags -->
