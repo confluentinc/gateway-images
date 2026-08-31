@@ -156,7 +156,7 @@
         -->
 
         <!-- Base Image Versions -->
-        <ubi9-minimal.image.version>9.8-1787647261</ubi9-minimal.image.version>
+        <ubi9-minimal.image.version>9.8-1788166357</ubi9-minimal.image.version>
 
         <!-- OS Package Versions -->
         <ubi9-minimal.temurin-21-jdk.version>21.0.12.1.0.1-0</ubi9-minimal.temurin-21-jdk.version>
