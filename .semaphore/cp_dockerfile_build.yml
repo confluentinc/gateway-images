@@ -432,6 +432,12 @@ promotions:
     auto_promote:
       # Run this promotion for RC branches
       when: "result = 'passed' and branch =~ '^\\d+\\.\\d+\\.\\d+-rc\\d+$'"
+  # Runs the sanity test and a produce/consume round-trip against the s390x image on a
+  # real IBM Z agent. Deliberately manual, not auto_promote: the s390x pool is small and
+  # jobs can queue for hours (CPBR-3953), so this is a one-click run per RC rather than
+  # something that fires on every build.
+  - name: 'Validate S390X on native agent'
+    pipeline_file: s390x_native_validation.yml
 after_pipeline:
   task:
     agent:

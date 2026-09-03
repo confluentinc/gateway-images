@@ -170,6 +170,24 @@ blocks:
             - . publish-test-results
             - artifact push workflow target/test-results
             - artifact push workflow target --destination target-S390X
+promotions:
+  # On-demand validation of any gateway image on a real IBM Z agent: runs the sanity test
+  # plus a Kafka produce/consume round-trip natively, rather than under QEMU emulation.
+  #
+  # This is the entry point that works from any branch, including before a release exists,
+  # which makes it the way to iterate on s390x_native_validation.yml itself. The other
+  # entry point is the promotion in cp_dockerfile_build.yml, which validates the dev ECR
+  # image at RC time; both drive the same pipeline via the GATEWAY_IMAGE override.
+  #
+  # Manual by design - the s390x pool is small and jobs can queue for hours (CPBR-3953).
+  - name: 'Validate S390X on native agent'
+    pipeline_file: s390x_native_validation.yml
+    parameters:
+      env_vars:
+        - name: GATEWAY_IMAGE
+          required: true
+          default_value: 'confluentinc/cpc-gateway:1.3.0'
+          description: "Image to validate on s390x. A published Docker Hub tag, or a dev ECR image if one exists for this branch."
 after_pipeline:
   task:
     agent:
