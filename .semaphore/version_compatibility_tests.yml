@@ -9,7 +9,7 @@ agent:
     type: s1-prod-ubuntu24-04-amd64-1
 
 execution_time_limit:
-  hours: 2
+  hours: 4
 
 global_job_config:
   prologue:
@@ -81,11 +81,11 @@ blocks:
                 PASSED_TESTS=0
                 SETUP_FAILED_TESTS=0
                 
-                if [ -f "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" ]; then
+                if [ -f "compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt" ]; then
                   # Count different test result types
-                  FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
-                  PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
-                  SETUP_FAILED_TESTS=$(grep -c "🚫 SETUP_FAILED" compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt 2>/dev/null || echo "0")
+                  FAILED_TESTS=$(grep -c "❌ FAIL" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
+                  PASSED_TESTS=$(grep -c "✅ PASS" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
+                  SETUP_FAILED_TESTS=$(grep -c "🚫 SETUP_FAILED" compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt 2>/dev/null || echo "0")
                   
                   # print raw counts for debugging
                   echo "Raw Counts - Total: ${TOTAL_TESTS}, Passed: ${PASSED_TESTS}, Failed: ${FAILED_TESTS}, Setup Failed: ${SETUP_FAILED_TESTS}"
@@ -135,7 +135,7 @@ blocks:
                 
                 echo "Test Summary:"
                 echo "" >> test_summary.txt
-                cat "compatibility-results/${LATEST_RESULTS_DIR}/compatibility_summary.txt" >> test_summary.txt
+                cat "compatibility-results/${LATEST_RESULTS_DIR}/reports/compatibility_summary.txt" >> test_summary.txt
               else
                 echo "No results directory found!"
                 echo "Test execution may have failed completely" > test_summary.txt

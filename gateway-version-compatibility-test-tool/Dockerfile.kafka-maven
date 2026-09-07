@@ -1,0 +1,44 @@
+# Custom Kafka image with Maven for JUnit testing
+# Extends the official Confluent Kafka image and adds Maven for test execution
+
+ARG KAFKA_VERSION=8.0.0
+FROM confluentinc/cp-kafka:${KAFKA_VERSION}
+
+# Install JDK and tools, then install newer Maven
+USER root
+RUN dnf update -y && \
+    dnf install -y \
+        java-11-openjdk-devel \
+        wget \
+        curl \
+        git && \
+    dnf clean all
+
+# Install Maven 3.9.6 (supports Java 17)
+RUN wget https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz && \
+    tar xzf apache-maven-3.9.6-bin.tar.gz -C /opt && \
+    ln -s /opt/apache-maven-3.9.6 /opt/maven && \
+    rm apache-maven-3.9.6-bin.tar.gz
+
+# Set JAVA_HOME and Maven path, prioritize Java 8 bin
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+ENV MAVEN_HOME=/opt/maven
+ENV PATH=${JAVA_HOME}/bin:${MAVEN_HOME}/bin:${PATH}
+
+# Verify Maven installation
+RUN mvn --version
+
+# Create directories for test results
+RUN mkdir -p /junit-results /html-results
+
+# Set appropriate permissions
+RUN chown -R appuser:appuser /junit-results /html-results
+
+# Switch back to appuser (Kafka's default user)
+USER appuser
+
+# Set default working directory
+WORKDIR /home/appuser
+
+# Default command (same as parent image)
+CMD ["sh", "-c", "sleep infinity"]

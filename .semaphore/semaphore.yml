@@ -30,7 +30,7 @@ global_job_config:
       - pip install confluent-devtools
       - export PACKAGING_BUCKET="s3://dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/"
       - export LATEST_PACKAGING_BUILD_NUMBER=latest # use packages in latest directory of corresponding nightly branch
-      - export GATEWAY_VERSION="1.0.0" #hardcoded for now
+      - export GATEWAY_VERSION="1.1.2" #hardcoded for now
       - export DEFAULT_OS_TYPE="ubi"
       - export PACKAGES_URL="https://s3-us-west-2.amazonaws.com/dev-gateway-packages-654654529379-us-west-2/confluent-gateway/$BRANCH_TAG/$LATEST_PACKAGING_BUILD_NUMBER/PACKAGE_TYPE"
       - export PACKAGING_BUILD_NUMBER=$LATEST_PACKAGING_BUILD_NUMBER
@@ -51,18 +51,17 @@ global_job_config:
                   export MAVEN_PACKAGES_URL=$PACKAGES_MAVEN_URL
               fi
           fi
-          # Overwrite maven global configuration
-          gh api repos/confluentinc/depot/contents/python/cp_devtools/templates/template_resources/maven/maven_semaphore_independent_release_packaging_settings.xml | jq -r '.content' | base64 -d > template-settings.xml
-          [[ -f ~/.m2/settings.xml ]] && mv ~/.m2/settings.xml ~/.m2/settings.xml.bak; envsubst < template-settings.xml > ~/.m2/settings.xml # Replacing maven settings with packaging specific settings
-        else
-          echo "This job is not a isHotfixJob or isRcJob (What we know how to handle) - and we don't know how to handle it"
         fi
+      - >-
+        set -o pipefail;
+        gh api repos/confluentinc/depot/contents/python/cp_devtools/templates/template_resources/maven/maven_semaphore_independent_release_packaging_settings.xml | jq -r '.content' | base64 -d > template-settings.xml || { echo "Failed to fetch depot Maven settings template" >&2; exit 1; };
+        set +o pipefail;
+        [[ -f ~/.m2/settings.xml ]] && mv ~/.m2/settings.xml ~/.m2/settings.xml.bak;
+        envsubst < template-settings.xml > ~/.m2/settings.xml
       - export DOCKER_DEV_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
       - export DOCKER_PROD_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/"
-      - export DOCKER_UPSTREAM_REGISTRY=$DOCKER_PROD_REGISTRY
       - export LATEST_TAG=$BRANCH_TAG-latest
-      - export DOCKER_UPSTREAM_TAG="8.1.x-latest"
-      - export DOCKER_REPOS="confluentinc/cpc-gateway"
+      - export DOCKER_REPOS="confluentinc/cpc-gateway confluentinc/confluent-gateway-for-cloud"
       - export MAVEN_EXTRA_ARGS=""
       - export DOCKER_DEV_TAG="dev-$BRANCH_TAG-$BUILD_NUMBER"
       - export AMD_ARCH=.amd64
@@ -91,8 +90,8 @@ blocks:
             - ci-tools ci-update-version
             - export OS_PACKAGES_URL=$(echo "$PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
-            - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY -Ddocker.upstream-registry=$DOCKER_UPSTREAM_REGISTRY
-              -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$AMD_ARCH -Ddocker.upstream-tag=$DOCKER_UPSTREAM_TAG$OS_TAG -Darch.type=$AMD_ARCH -Ddocker.os_type=ubi9
+            - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
+              -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$AMD_ARCH -Darch.type=$AMD_ARCH -Ddocker.os_type=ubi9
               $PACKAGING_BUILD_ARGS -Ddependency.check.skip=true $MAVEN_EXTRA_ARGS
             - . cache-maven store
             - >-
@@ -124,8 +123,8 @@ blocks:
             - export OS_PACKAGES_URL=$(echo "$PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
             - ci-tools ci-update-version
-            - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY -Ddocker.upstream-registry=$DOCKER_UPSTREAM_REGISTRY
-              -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$ARM_ARCH -Ddocker.upstream-tag=$DOCKER_UPSTREAM_TAG$OS_TAG -Darch.type=$ARM_ARCH -Ddocker.os_type=ubi9
+            - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
+              -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$ARM_ARCH -Darch.type=$ARM_ARCH -Ddocker.os_type=ubi9
               $PACKAGING_BUILD_ARGS -Ddependency.check.skip=true $MAVEN_EXTRA_ARGS
             - . cache-maven store
             - for image in $ARM_DOCKER_DEV_FULL_IMAGES; do echo "Pushing $image" && docker push $image; done
@@ -150,7 +149,7 @@ after_pipeline:
       - name: SonarQube
         commands:
           - checkout
-          - sem-version java 11
+          - sem-version java 17
           - artifact pull workflow target-AMD
           - artifact pull workflow target-ARM
-          - emit-sonarqube-data --run_only_sonar_scan
+          - emit-sonarqube-data --enable_sonarqube_enterprise --run_only_sonar_scan
