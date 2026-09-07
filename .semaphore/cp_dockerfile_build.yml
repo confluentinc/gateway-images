@@ -63,7 +63,7 @@ global_job_config:
               fi
           fi
         else
-          echo "This job is not a isHotfixJob or isRcJob (What we know how to handle) - and we don't know how to handle it"
+          echo "Not an IS_RELEASE+PACKAGING_BUILD_NUMBER build - skipping RC-specific MAVEN_PACKAGES_URL override (expected for PR/nightly builds; the depot Maven settings template below still applies unconditionally)"
         fi
       - >-
         set -o pipefail;
