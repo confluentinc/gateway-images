@@ -82,7 +82,7 @@ gateway:
                 config:
                   address: http://vault:8200
                   authToken: vault-plaintext-root-token
-                  path: secret/testing
+                  prefixPath: secret/
                   separator: /
       
           streamingDomains:
