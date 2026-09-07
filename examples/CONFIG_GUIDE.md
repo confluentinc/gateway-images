@@ -155,8 +155,6 @@ KafkaServer {
 
 #### MTLS Authentication
 
-_note: feature is not present in early access_
-
 ```yaml
 mtls:
   ssl:
