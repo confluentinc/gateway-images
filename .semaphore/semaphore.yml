@@ -60,8 +60,6 @@ global_job_config:
                   export MAVEN_PACKAGES_URL=$PACKAGES_MAVEN_URL
               fi
           fi
-        else
-          echo "Not an IS_RELEASE+PACKAGING_BUILD_NUMBER build - skipping RC-specific MAVEN_PACKAGES_URL override (expected for PR/nightly builds; the depot Maven settings template below still applies unconditionally)"
         fi
       - >-
         set -o pipefail;
