@@ -26,7 +26,7 @@ services:
         while ! vault status; do sleep 1; done
         export VAULT_TOKEN=$( echo $${VAULT_DEV_ROOT_TOKEN_ID})
         # Write secrets to the Vault secrets engine
-        vault kv put secret/testing test_user=test_user/swapped_password
+        vault kv put secret/test_user value=test_user/swapped_password
         sleep infinity
 
 # Below is a set of configs to bring up a single node Kafka setup with a single container acting as both broker and controller. 
