@@ -21,8 +21,8 @@ echo "Vault is ready!"
 
 # 4. Add SCRAM authentication secrets to Vault
 echo "Adding secrets to Vault..."
-docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv put secret/admin-user password=admin/admin-secret
-docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv put secret/test_user password=test_user/swapped_password
+docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv put secret/admin-user value=admin/admin-secret
+docker exec -e VAULT_TOKEN=vault-plaintext-root-token vault vault kv put secret/test_user value=test_user/swapped_password
 
 # 5. Verify the secrets were created
 echo "Verifying secrets..."
