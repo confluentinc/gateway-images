@@ -162,7 +162,7 @@
         <ubi9-minimal.temurin-21-jdk.version>21.0.12.1.0.1-0</ubi9-minimal.temurin-21-jdk.version>
 
         <!-- GitHub Repository Tags -->
-        <git-repo.cp-docker-utils.tag>v1.0.17</git-repo.cp-docker-utils.tag>
+        <git-repo.cp-docker-utils.tag>v1.0.18</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
         <golang.image.version>1.27.1-trixie</golang.image.version>
