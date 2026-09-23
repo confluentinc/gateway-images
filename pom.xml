@@ -49,7 +49,7 @@
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
-                <version>8.3.2</version>
+                <version>8.4.0</version>
             </dependency>
 
             <dependency>
