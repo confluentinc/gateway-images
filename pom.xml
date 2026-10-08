@@ -159,7 +159,7 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1790665138</ubi9.image.version>
+        <ubi9.image.version>9.8-1791269371</ubi9.image.version>
         <ubi9-micro.image.version>9.8-1789345812</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
@@ -170,7 +170,7 @@
         <git-repo.cp-docker-utils.tag>v1.0.18</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.27.1-trixie</golang.image.version>
+        <golang.image.version>1.27.2-trixie</golang.image.version>
 
     </properties>
 </project>
