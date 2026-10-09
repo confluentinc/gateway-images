@@ -35,6 +35,7 @@
     <modules>
         <module>gateway</module>
         <module>confluent-gateway-for-cloud</module>
+        <module>confluent-gateway</module>
     </modules>
 
     <dependencyManagement>

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+. /etc/confluent/docker/bash-config
+
+# Directory for runtime-generated config: the templated/inline config, the node config handed to
+# the Gateway, and licenses. Defaults to a writable path (/tmp/${COMPONENT}) so the Gateway can run
+# under readOnlyRootFilesystem: true; only generated files live here.
+GATEWAY_TMP_DIR="${GATEWAY_TMP_DIR:-/tmp/${COMPONENT}}"
+mkdir -p "${GATEWAY_TMP_DIR}"
+
+ub path "${GATEWAY_TMP_DIR}" writable
+
+# Resolve the Gateway config file in priority order:
+#   1. GATEWAY_CONFIG_FILE  - use the file as-is (e.g. mounted by confluent-operator)
+#   2. GATEWAY_CONFIG       - inline config; write it to ${GATEWAY_TMP_DIR}/gateway-config.yaml
+#   3. GATEWAY_CONFIG_TEMPLATE - render the template to ${GATEWAY_TMP_DIR}/gateway-config.yaml
+if [[ -n "${GATEWAY_CONFIG_FILE-}" ]]; then
+  echo "===> Using GATEWAY_CONFIG_FILE environment variable: ${GATEWAY_CONFIG_FILE}"
+elif [[ -n "${GATEWAY_CONFIG-}" ]]; then
+  echo "===> Using GATEWAY_CONFIG environment variable"
+  GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
+  echo "${GATEWAY_CONFIG}" > "${GATEWAY_CONFIG_FILE}"
+elif [[ -n "${GATEWAY_CONFIG_TEMPLATE-}" && -f "${GATEWAY_CONFIG_TEMPLATE}" ]]; then
+  echo "===> Templating configuration file from GATEWAY_CONFIG_TEMPLATE"
+  GATEWAY_CONFIG_FILE="${GATEWAY_TMP_DIR}/gateway-config.yaml"
+  ub render-template "${GATEWAY_CONFIG_TEMPLATE}" > "${GATEWAY_CONFIG_FILE}"
+else
+  echo "ERROR: No Gateway config provided. Set one of GATEWAY_CONFIG_FILE, GATEWAY_CONFIG, or GATEWAY_CONFIG_TEMPLATE." >&2
+  exit 1
+fi
+
+echo "===> Checking Licenses Text..."
+if [[ -n "${GATEWAY_LICENSES-}" ]]; then
+  echo "===> Using GATEWAY_LICENSES environment variable"
+  LICENSES_TXT_PATH="${GATEWAY_TMP_DIR}/licenses.txt"
+  echo "${GATEWAY_LICENSES}" > "${LICENSES_TXT_PATH}"
+fi
