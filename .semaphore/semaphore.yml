@@ -59,7 +59,7 @@ global_job_config:
       - export DOCKER_DEV_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/dev/"
       - export DOCKER_PROD_REGISTRY="519856050701.dkr.ecr.us-west-2.amazonaws.com/docker/prod/"
       - export LATEST_TAG=$BRANCH_TAG-latest
-      - export DOCKER_REPOS="confluentinc/cpc-gateway confluentinc/confluent-gateway-for-cloud"
+      - export DOCKER_REPOS="confluentinc/cpc-gateway confluentinc/confluent-gateway-for-cloud confluentinc/confluent-gateway"
       - export MAVEN_EXTRA_ARGS=""
       - export DOCKER_DEV_TAG="dev-$BRANCH_TAG-$BUILD_NUMBER"
       - export AMD_ARCH=.amd64

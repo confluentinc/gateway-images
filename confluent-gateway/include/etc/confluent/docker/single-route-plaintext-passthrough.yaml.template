@@ -1,0 +1,29 @@
+gateway:
+  name: {{ getEnv "GATEWAY_NAME" "gateway-1" }}
+  streamingDomains:
+    - name: {{ getEnv "GATEWAY_STREAMING_DOMAIN" "default-domain" }}
+      kafkaCluster:
+        name: {{ getEnv "GATEWAY_KAFKA_CLUSTER_NAME" "kafka-cluster" }}
+        bootstrapServers:
+          - endpoint: {{ getEnv "GATEWAY_KAFKA_BOOTSTRAP_SERVER" "localhost:9092" }}
+            id: plaintext
+        nodeIdRanges:
+          - name: {{ getEnv "GATEWAY_KAFKA_NODE_ID_RANGE_NAME" "default-range" }}
+            start: {{ getEnv "GATEWAY_KAFKA_NODE_ID_RANGE_START" "0" | int }}
+            end: {{ getEnv "GATEWAY_KAFKA_NODE_ID_RANGE_END" "2" | int }}
+  routes:
+    - name: {{ getEnv "GATEWAY_ROUTE_NAME" "default-route" }}
+      endpoint: {{ getEnv "GATEWAY_ROUTE_ENDPOINT" "localhost:9192" }}
+      brokerIdentificationStrategy:
+        type: {{ getEnv "GATEWAY_BROKER_IDENTIFICATION_STRATEGY" "port" }}
+        pattern: {{ getEnv "GATEWAY_BROKER_IDENTIFICATION_PATTERN" "" }}
+      streamingDomain:
+        name: {{ getEnv "GATEWAY_STREAMING_DOMAIN" "default-domain" }}
+        bootstrapServerId: {{ getEnv "GATEWAY_KAFKA_BOOTSTRAP_SERVER_ID" "plaintext" }}
+      security:
+        auth: "passthrough"
+  admin:
+    endpoints:
+      metrics: true
+  advanced:
+    useIoUring: false
