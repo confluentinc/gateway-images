@@ -103,7 +103,7 @@ setup_python_env() {
         pip install -r requirements.txt
     else
         # Fallback to manual installation
-        pip install requests pandas numpy matplotlib seaborn
+        pip install requests
     fi
     
     echo "✅ Python environment ready"
