@@ -60,6 +60,12 @@
                 <artifactId>utility-belt</artifactId>
                 <version>8.4.0</version>
             </dependency>
+            <!-- the released common 8.3.2 that release builds pin to pulls lz4-java 1.11.1 via kafka-clients -->
+            <dependency>
+                <groupId>at.yawk.lz4</groupId>
+                <artifactId>lz4-java</artifactId>
+                <version>1.11.4</version>
+            </dependency>
 
             <dependency>
                 <groupId>org.jolokia</groupId>
