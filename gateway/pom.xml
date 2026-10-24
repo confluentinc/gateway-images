@@ -23,6 +23,17 @@
       <scope>test</scope>
     </dependency>
 
+    <!-- utility-belt pulls in the JUnit 5 platform launcher transitively (via
+         kafka-test-common-runtime), which makes Surefire auto-select the JUnit 5 provider.
+         Without this bridge engine, plain JUnit 4 @Test classes are silently discovered as
+         zero tests instead of failing loudly. See JmxPrometheusJavaagentVersionPinTest. -->
+    <dependency>
+      <groupId>org.junit.vintage</groupId>
+      <artifactId>junit-vintage-engine</artifactId>
+      <version>5.13.1</version>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Java dependencies of cp-base-java docker image -->
     <dependency>
       <groupId>io.confluent</groupId>
@@ -55,6 +66,14 @@
     </dependency>
   </dependencies>
   <build>
+    <testResources>
+      <!-- Filtering resolves ${jmx_prometheus_javaagent.version} (etc.) into
+           build-versions.properties for JmxPrometheusJavaagentVersionPinTest. -->
+      <testResource>
+        <directory>src/test/resources</directory>
+        <filtering>true</filtering>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
