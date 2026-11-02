@@ -69,6 +69,8 @@ global_job_config:
       - export S390X_PACKAGES_URL="${PACKAGES_URL/\/confluent-gateway\///confluent-gateway/s390x/}"
       # The s390x agents reach S3 through an interface VPC endpoint, which serves only the s3.us-west-2 hostnames
       - export S390X_PACKAGES_URL="${S390X_PACKAGES_URL/s3-us-west-2.amazonaws.com/s3.us-west-2.amazonaws.com}"
+      # TEMPORARY, DO NOT MERGE: master has no s390x latest/ until gateway-packaging#178 merges -- use that PR's build.
+      - export S390X_PACKAGES_URL="https://s3.us-west-2.amazonaws.com/dev-gateway-packages-654654529379-us-west-2/confluent-gateway/s390x/pr/PR-178/7/PACKAGE_TYPE/$GATEWAY_MAJOR_MINOR"
 blocks:
   - name: Validation
     dependencies: []
