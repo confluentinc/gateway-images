@@ -160,9 +160,10 @@ blocks:
             - export OS_PACKAGES_URL=$(echo "$S390X_PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
             # s390x agents have no ci-tools, so the s390x image builds from the pom's own version instead of the nano version (CPBR-4313)
+            # docker.verbose prints the docker build output: s390x agents have no SSH debug, so the log is the only way to see a failing step
             - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker-fabric8 clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
               -DBUILD_NUMBER=$BUILD_NUMBER -DGIT_COMMIT=$GIT_COMMIT -Ddocker.tag=$DOCKER_DEV_TAG$OS_TAG$S390X_ARCH -Darch.type=$S390X_ARCH -Ddocker.os_type=ubi9
-              $PACKAGING_BUILD_ARGS -Ddependency.check.skip=true $MAVEN_EXTRA_ARGS
+              -Ddocker.verbose=build $PACKAGING_BUILD_ARGS -Ddependency.check.skip=true $MAVEN_EXTRA_ARGS
             - |
               for image in $S390X_DOCKER_DEV_FULL_IMAGES; do
                 arch=$(docker image inspect --format '{{.Architecture}}' "$image")
