@@ -1,3 +1,5 @@
+# Basic Gateway configuration for SNI-based routing with TLS
+# For multi-node setups, see gateway-wildcard.yaml or gateway-node-specific.yaml
 gateway:
   admin:
     endpoints:
@@ -9,12 +11,13 @@ gateway:
         name: kafka-cluster-1
         bootstrapServers:
           - id: localkafka
-            endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint 
+            endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint
   routes:
     - name: sni-route
       endpoint: "kafka.gateway.local:19092"
       brokerIdentificationStrategy:
         type: host
+        # Single node pattern - for multi-node use: "broker$(nodeId).$(gatewayNodeId).kafka.gateway.local"
         pattern: "broker$(nodeId).kafka.gateway.local"
       streamingDomain:
         name: sample-domain
