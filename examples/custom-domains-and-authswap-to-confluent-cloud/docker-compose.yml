@@ -1,0 +1,69 @@
+services:
+  vault:
+    image: hashicorp/vault:1.14
+    hostname: vault
+    container_name: vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8200"
+      VAULT_API_ADDR: "http://0.0.0.0:8200"
+      VAULT_DEV_ROOT_TOKEN_ID: "vault-plaintext-root-token"
+    command:
+      - /bin/sh
+      - -c
+      - |
+        ./usr/local/bin/docker-entrypoint.sh server -dev &
+        echo "Waiting for Vault to start..."
+        # Wait until vault is ready
+        while ! vault status; do sleep 1; done
+        export VAULT_TOKEN=$( echo $${VAULT_DEV_ROOT_TOKEN_ID})
+        # Write secrets to the Vault secrets engine
+        vault kv put secret/cluster-1 test_user=<your-API-Key-1>/<your-API-Key-1>
+        vault kv put secret/cluster-2 test_user=<your-API-Key-2>/<your-API-Key-2>
+        sleep infinity
+  gateway:
+    image: "${GATEWAY_IMAGE:-confluentinc/cpc-gateway:latest}"
+    container_name: gateway
+    depends_on:    
+      - vault
+    volumes:
+      - ./gateway.yaml:/etc/gateway/gateway.yaml:ro
+      - ./ssl:/etc/gateway/ssl:ro    
+      - ./jaas-config-for-gw-authn-cluster-1.conf:/etc/gateway/config/jaas-config-for-gw-authn-cluster-1.conf
+      - ./jaas-config-for-gw-authn-cluster-2.conf:/etc/gateway/config/jaas-config-for-gw-authn-cluster-2.conf
+      - ./jaas-template-for-gw-swapping.conf:/etc/gateway/config/jaas-template-for-gw-swapping.conf
+    environment:
+      GATEWAY_CONFIG_FILE: /etc/gateway/gateway.yaml
+      GATEWAY_PK: pkc1234.confluent.cloud:9092
+    ports:
+      - "19002:19002"
+      - "19003:19003"
+      - "19004:19004"
+      - "19005:19005"
+      - "19006:19006"
+      - "19007:19007"
+      - "19008:19008"
+      - "19009:19009"
+      - "19010:19010"
+      - "19011:19011"
+      - "19012:19012"
+      
+      - "19102:19102"
+      - "19103:19103"
+      - "19104:19104"
+      - "19105:19105"
+      - "19106:19106"
+      - "19107:19107"
+      - "19108:19108"
+      - "19109:19109"
+      - "19110:19110"
+      - "19111:19111"
+      - "19112:19112"
+
+      - "9190:9190"
+    command: |
+      bash -c "
+        chmod +x /etc/confluent/docker/run 2>/dev/null || true
+        exec /etc/confluent/docker/run
+      "
