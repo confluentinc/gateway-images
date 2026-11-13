@@ -165,8 +165,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.kafka-maven
-      args:
-        KAFKA_VERSION: ${KAFKA_CLIENT_VERSION}
     depends_on:
       gateway:
         condition: service_started
