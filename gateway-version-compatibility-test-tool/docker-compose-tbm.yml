@@ -49,7 +49,7 @@ services:
       <<: *broker-env
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-server:9093'
-      CLUSTER_ID: 'MkUtXwzBR9mJHj3b2pXGgYQ'
+      CLUSTER_ID: 'mQSZDvCBW2agjlCdN9BMHA' # a base64 UUID (7.x brokers check)
 
   kafka-server-b:
     <<: *broker
@@ -58,7 +58,7 @@ services:
       <<: *broker-env
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-server-b:9092
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka-server-b:9093'
-      CLUSTER_ID: 'Tbm2XwzBR9mJHj3b2pXGgYQ'
+      CLUSTER_ID: 'KDNRErCBXgCXdNhV4FPmIA'
 
   gateway:
     image: ${DOCKER_REGISTRY:-}confluentinc/cpc-gateway:latest
@@ -148,8 +148,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.kafka-maven
-      args:
-        KAFKA_VERSION: ${KAFKA_CLIENT_VERSION}
     depends_on:
       gateway:
         condition: service_started
