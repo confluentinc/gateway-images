@@ -1,6 +1,9 @@
 #!/bin/bash
-# streamlined-compatibility-test.sh
-# 16 combinations: Java clients only (4×4 matrix)
+# Gateway version compatibility tests, Java clients:
+#   standard  every client x server version, through PLAINTEXT, SASL and SSL routes
+#             (docker-compose.yml, or docker-compose-kraft.yml for 8.0.0+ servers)
+#   tbm       topic-based routing: one dynamic route over two clusters (docker-compose-tbm.yml),
+#             every client version x TBM_SERVER_PAIRS
 
 GATEWAY_METRICS="http://localhost:9190/metrics"
 
@@ -17,9 +20,12 @@ wait_for_gateway() {
 RESULTS_DIR="compatibility-results/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
-# Simplified matrix - Java clients only
-CLIENTS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
-SERVERS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0")
+# Java clients only
+CLIENTS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0" "8.1.0" "8.2.0" "8.3.0" "8.4.0")
+SERVERS=("7.4.0" "7.5.0" "7.6.0" "7.7.0" "7.8.0" "7.9.0" "8.0.0" "8.1.0" "8.2.0" "8.3.0" "8.4.0")
+# TBM: "<cluster A> <cluster B>" server versions (A is the coordination cluster). Same-version
+# pairs, plus oldest/newest mixes: the router advertises only the API versions both support.
+TBM_SERVER_PAIRS=("7.4.0 7.4.0" "8.0.0 8.0.0" "8.4.0 8.4.0" "7.4.0 8.4.0" "8.4.0 7.4.0")
 
 # =============================================================================
 # SSL CERTIFICATE GENERATION
@@ -230,7 +236,7 @@ run_compatibility_test() {
     
     # Determine Java version and Maven settings based on Kafka client version
     java_settings=""
-    if [[ "$client_ver" == "8.0.0" ]]; then
+    if version_ge "$client_ver" "8.0.0"; then
         # Dockerfile sets JAVA_HOME=/usr/lib/jvm/java-11-openjdk (Red Hat OpenJDK);
         # don't override it — the Zulu path no longer exists in this image.
         maven_java_args="-Dmaven.compiler.source=11 -Dmaven.compiler.target=11"
@@ -252,6 +258,7 @@ run_compatibility_test() {
             -DserverVersion=$server_ver \
             -Dkafka.version=$client_ver \
             -Dbootstrap.servers=gateway:19092 \
+            -Dtest=AdvancedKafkaTest \
             -Dmaven.test.failure.ignore=false \
             -Dmaven.surefire.reports.directory=/junit-results/plaintext \
             -Dsurefire.failIfNoSpecifiedTests=false \
@@ -272,6 +279,7 @@ run_compatibility_test() {
             -DserverVersion=$server_ver \
             -Dkafka.version=$client_ver \
             -Dbootstrap.servers=gateway:19095 \
+            -Dtest=AdvancedKafkaTest \
             -Dmaven.test.failure.ignore=false \
             -Dmaven.surefire.reports.directory=/junit-results/sasl-admin \
             -Dsurefire.failIfNoSpecifiedTests=false \
@@ -290,6 +298,7 @@ run_compatibility_test() {
             -DserverVersion=$server_ver \
             -Dkafka.version=$client_ver \
             -Dbootstrap.servers=gateway:19098 \
+            -Dtest=AdvancedKafkaTest \
             -Dmaven.test.failure.ignore=false \
             -Dmaven.surefire.reports.directory=/junit-results/ssl \
             -Dsurefire.failIfNoSpecifiedTests=false \
@@ -379,6 +388,90 @@ run_compatibility_test() {
     echo "Completed: $test_id"
 }
 
+# mark_setup_failed <test_id> <type> <message>
+mark_setup_failed() {
+    {
+        echo "SETUP_FAILED: $3"
+        echo "FAILURE_TYPE: $2"
+        echo "TIMESTAMP: $(date -Iseconds)"
+    } > "$RESULTS_DIR/${1}_status.txt"
+}
+
+# run_tbm_test <client> <cluster A server> <cluster B server>: DynamicRoutingTest through one
+# dynamic route over two clusters (docker-compose-tbm.yml). Results as run_compatibility_test's,
+# with the JUnit reports under <test_id>_junit/tbm-ssl.
+run_tbm_test() {
+    local client_ver=$1 server_a=$2 server_b=$3
+    local test_id="java${client_ver}_server${server_a}+${server_b}"
+    local compose="docker-compose-tbm.yml"
+
+    echo "Testing TBM: Java Client ${client_ver} with Kafka clusters ${server_a} (A) and ${server_b} (B)"
+    echo "Test ID: $test_id"
+    echo "----------------------------------------"
+    if [ ! -d "ssl" ] || [ ! -f "ssl/kafka.keystore.jks" ]; then
+        generate_ssl_certificates
+    fi
+    export KAFKA_CLIENT_VERSION="$client_ver" KAFKA_SERVER_VERSION="$server_a" KAFKA_SERVER_B_VERSION="$server_b"
+    mkdir -p "$RESULTS_DIR/${test_id}_junit"
+
+    if ! docker-compose -f $compose up -d; then
+        echo "❌ Failed to start the TBM services"
+        mark_setup_failed "$test_id" DOCKER_COMPOSE_FAILED "Docker compose failed to start services (TBM)"
+        docker-compose -f $compose down
+        return 1
+    fi
+    if ! wait_for_gateway; then
+        echo "❌ Gateway not responding. Exiting test."
+        docker-compose -f $compose logs --no-color --tail=50
+        mark_setup_failed "$test_id" GATEWAY_NOT_RESPONDING "Gateway not responding"
+        docker-compose -f $compose down
+        return 1
+    fi
+
+    docker cp pom.xml kafka-client-test:/tmp/
+    docker cp src/ kafka-client-test:/tmp/
+    local maven_java_args="-Dmaven.compiler.source=8 -Dmaven.compiler.target=8"
+    if version_ge "$client_ver" "8.0.0"; then
+        maven_java_args="-Dmaven.compiler.source=11 -Dmaven.compiler.target=11"
+    fi
+
+    echo "🔀 Testing topic-based routing over SSL (gateway.tbm.test:19400)..."
+    local rc=0
+    docker exec kafka-client-test bash -c "
+        cd /tmp &&
+        mvn test \
+            -Dtest=DynamicRoutingTest \
+            -Dkafka.version=$client_ver \
+            -Dbootstrap.servers=gateway.tbm.test:19400 \
+            -Dtbm.cluster.a.bootstrap=kafka-server:9092 \
+            -Dtbm.cluster.b.bootstrap=kafka-server-b:9092 \
+            -Dmaven.test.failure.ignore=false \
+            -Dmaven.surefire.reports.directory=/junit-results/tbm-ssl \
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            $maven_java_args \
+            -q
+    " || rc=1
+    docker cp kafka-client-test:/junit-results/tbm-ssl/ "$RESULTS_DIR/${test_id}_junit/" 2>/dev/null \
+        || echo "⚠️ Could not copy TBM JUnit results"
+
+    if [ $rc -ne 0 ]; then
+        echo "❌ TBM tests failed for client $client_ver with clusters $server_a + $server_b"
+        docker-compose -f $compose logs --no-color --tail=50
+        {
+            echo "FAILED: JUnit tests failed"
+            echo "FAILURE_TYPE: JUNIT_FAILED"
+            echo "TIMESTAMP: $(date -Iseconds)"
+        } > "$RESULTS_DIR/${test_id}_status.txt"
+        docker-compose -f $compose down
+        return 1
+    fi
+    echo "✅ TBM tests passed for client $client_ver with clusters $server_a + $server_b"
+    sleep 5
+    curl -s "$GATEWAY_METRICS" > "$RESULTS_DIR/${test_id}_metrics.txt"
+    docker-compose -f $compose down
+    echo "Completed: $test_id"
+}
+
 # Function to generate final compatibility report using enhanced Python parser
 generate_final_report() {
     echo "Generating compatibility summary..."
@@ -420,20 +513,25 @@ generate_final_report() {
 # =============================================================================
 
 
-# Main execution
+# Main execution. With SHARD=<i>/<n> (1-based), runs only every n-th combination starting at
+# the i-th, so n parallel jobs split the matrix.
 main() {
     client_count=${#CLIENTS[@]}
     server_count=${#SERVERS[@]}
     total_combinations=$((client_count * server_count))
+    local shard_index=1 shard_count=1
+    if [[ -n "${SHARD:-}" ]]; then
+        shard_index=${SHARD%/*} shard_count=${SHARD#*/}
+    fi
     echo "KAFKA CLIENT COMPATIBILITY TESTING"
-    echo "Matrix: $client_count Java client versions × $server_count server versions = $total_combinations combinations"
+    echo "Matrix: $client_count Java client versions × $server_count server versions = $total_combinations combinations (shard $shard_index/$shard_count)"
     echo "Results: $RESULTS_DIR"
     echo ""
     echo "ℹ️  Tests will be compiled and run via Maven inside the test container"
     echo ""
     
-    local test_count=0
-    local total_tests=$total_combinations
+    local test_count=0 combo=0
+    local total_tests=$(( (total_combinations - shard_index) / shard_count + 1 ))
     local overall_failed=0
 
     # start timer
@@ -442,6 +540,8 @@ main() {
     # Run all combinations
     for client_ver in "${CLIENTS[@]}"; do
         for server_ver in "${SERVERS[@]}"; do
+            combo=$((combo + 1))
+            (( (combo - shard_index) % shard_count == 0 )) || continue
             test_count=$((test_count + 1))
             echo "[$test_count/$total_tests] Testing combination..."
             run_compatibility_test $client_ver $server_ver || overall_failed=1
@@ -462,11 +562,50 @@ main() {
     return $overall_failed
 }
 
+# TBM: every client version x TBM_SERVER_PAIRS.
+main_tbm() {
+    local total=$(( ${#CLIENTS[@]} * ${#TBM_SERVER_PAIRS[@]} )) count=0 failed=0 pair
+    echo "TOPIC-BASED ROUTING (TBM) COMPATIBILITY TESTING"
+    echo "Matrix: ${#CLIENTS[@]} Java client versions × ${#TBM_SERVER_PAIRS[@]} cluster pairs = $total combinations"
+    echo "Results: $RESULTS_DIR"
+    local start=$(date +%s)
+    for client_ver in "${CLIENTS[@]}"; do
+        for pair in "${TBM_SERVER_PAIRS[@]}"; do
+            count=$((count + 1))
+            echo "[$count/$total] Testing combination..."
+            # shellcheck disable=SC2086 # the pair is two words
+            run_tbm_test "$client_ver" $pair || failed=1
+            sleep 3
+        done
+    done
+    echo ""
+    echo "Total testing time: $(( $(date +%s) - start )) seconds"
+    generate_final_report
+    return $failed
+}
+
 # Usage
 case "$1" in
     "--run")
         setup_python_env  # Set up Python environment before running tests
         main
+        ;;
+    "--tbm-run")
+        setup_python_env
+        main_tbm
+        ;;
+    "--tbm-single")
+        if [ $# -ne 4 ]; then
+            echo "Usage: $0 --tbm-single <client_version> <cluster_a_version> <cluster_b_version>"
+            exit 1
+        fi
+        setup_python_env
+        run_tbm_test "$2" "$3" "$4"
+        SINGLE_RC=$?
+        source venv/bin/activate
+        python3 enhanced_metrics_parser.py "$RESULTS_DIR"
+        deactivate
+        exit $SINGLE_RC
         ;;
     "--single")
         if [ $# -ne 3 ]; then
@@ -498,8 +637,10 @@ case "$1" in
         ;;
     *)
         echo "Usage:"
-        echo "  $0 --run                    # Run all 16 test combinations"
-        echo "  $0 --single 7.6.0 7.8.0     # Test single combination"
+        echo "  $0 --run                    # Run every client x server combination (SHARD=i/n: a slice)"
+        echo "  $0 --single 7.6.0 7.8.0     # Test single combination (client, server)"
+        echo "  $0 --tbm-run                # Run every client x TBM cluster pair"
+        echo "  $0 --tbm-single 8.4.0 7.4.0 8.4.0  # One TBM combination (client, cluster A, cluster B)"
         echo "  $0 --parse results_dir      # Parse existing results"
         echo "  $0 --setup-env              # Set up Python environment only"
         echo ""
