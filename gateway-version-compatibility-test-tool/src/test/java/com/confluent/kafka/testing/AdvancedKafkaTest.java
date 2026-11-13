@@ -294,12 +294,17 @@ public class AdvancedKafkaTest {
         }
     }
     
+    // AppInfoParser moved to common.utils.internals in newer clients: look it up by name.
     private static String getKafkaVersion() {
-        try {
-            return org.apache.kafka.common.utils.AppInfoParser.getVersion();
-        } catch (Exception e) {
-            return "unknown";
+        for (String cls : new String[] {"org.apache.kafka.common.utils.AppInfoParser",
+                                        "org.apache.kafka.common.utils.internals.AppInfoParser"}) {
+            try {
+                return (String) Class.forName(cls).getMethod("getVersion").invoke(null);
+            } catch (Exception e) {
+                // try the next location
+            }
         }
+        return "unknown";
     }
     
     // Cross-version compatibility helper methods using reflection
