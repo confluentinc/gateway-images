@@ -224,11 +224,15 @@ run_compatibility_test() {
     # Check if Maven project was copied successfully
     if ! docker exec kafka-client-test test -f /tmp/pom.xml; then
         echo "❌ Failed to copy Maven project files to container"
+        mark_setup_failed "$test_id" SOURCE_COPY_FAILED "Failed to copy Maven project files to container"
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
     
     if ! docker exec kafka-client-test test -d /tmp/src; then
         echo "❌ Failed to copy source files to container"
+        mark_setup_failed "$test_id" SOURCE_COPY_FAILED "Failed to copy source files to container"
+        docker-compose -f $COMPOSE_FILE down
         return 1
     fi
     
@@ -394,6 +398,14 @@ mark_setup_failed() {
         echo "FAILURE_TYPE: $2"
         echo "TIMESTAMP: $(date -Iseconds)"
     } > "$RESULTS_DIR/${1}_status.txt"
+    return 0
+}
+
+# expect_outcomes <test_id>...: record the combinations this run will test, before running any,
+# so ci-report.sh can fail the suite when one ends without an outcome (no _metrics.txt or
+# _status.txt), e.g. the run died part way.
+expect_outcomes() {
+    printf '%s\n' "$@" >> "$RESULTS_DIR/expected_combinations.txt"
 }
 
 # run_tbm_test <client> <cluster A server> <cluster B server>: DynamicRoutingTest through one
@@ -407,7 +419,7 @@ run_tbm_test() {
     echo "Testing TBM: Java Client ${client_ver} with Kafka clusters ${server_a} (A) and ${server_b} (B)"
     echo "Test ID: $test_id"
     echo "----------------------------------------"
-    if [ ! -d "ssl" ] || [ ! -f "ssl/kafka.keystore.jks" ]; then
+    if [[ ! -f "ssl/kafka.keystore.jks" ]]; then
         generate_ssl_certificates
     fi
     export KAFKA_CLIENT_VERSION="$client_ver" KAFKA_SERVER_VERSION="$server_a" KAFKA_SERVER_B_VERSION="$server_b"
@@ -453,7 +465,7 @@ run_tbm_test() {
     docker cp kafka-client-test:/junit-results/tbm-ssl/ "$RESULTS_DIR/${test_id}_junit/" 2>/dev/null \
         || echo "⚠️ Could not copy TBM JUnit results"
 
-    if [ $rc -ne 0 ]; then
+    if [[ $rc -ne 0 ]]; then
         echo "❌ TBM tests failed for client $client_ver with clusters $server_a + $server_b"
         docker-compose -f $compose logs --no-color --tail=50
         {
@@ -529,25 +541,32 @@ main() {
     echo "ℹ️  Tests will be compiled and run via Maven inside the test container"
     echo ""
     
-    local test_count=0 combo=0
-    local total_tests=$(( (total_combinations - shard_index) / shard_count + 1 ))
+    local test_count=0 combo=0 combos=() pair
     local overall_failed=0
+    for client_ver in "${CLIENTS[@]}"; do
+        for server_ver in "${SERVERS[@]}"; do
+            combo=$((combo + 1))
+            if (( (combo - shard_index) % shard_count == 0 )); then
+                combos+=("$client_ver $server_ver")
+                expect_outcomes "java${client_ver}_server${server_ver}"
+            fi
+        done
+    done
+    local total_tests=${#combos[@]}
+    setup_python_env
 
     # start timer
     CURRENT_TIME=$(date +%s)
 
-    # Run all combinations
-    for client_ver in "${CLIENTS[@]}"; do
-        for server_ver in "${SERVERS[@]}"; do
-            combo=$((combo + 1))
-            (( (combo - shard_index) % shard_count == 0 )) || continue
-            test_count=$((test_count + 1))
-            echo "[$test_count/$total_tests] Testing combination..."
-            run_compatibility_test $client_ver $server_ver || overall_failed=1
+    # Run this shard's combinations
+    for pair in "${combos[@]}"; do
+        test_count=$((test_count + 1))
+        echo "[$test_count/$total_tests] Testing combination..."
+        # shellcheck disable=SC2086 # the pair is two words
+        run_compatibility_test $pair || overall_failed=1
 
-            # Brief pause between tests
-            sleep 3
-        done
+        # Brief pause between tests
+        sleep 3
     done
 
     # end timer
@@ -567,6 +586,12 @@ main_tbm() {
     echo "TOPIC-BASED ROUTING (TBM) COMPATIBILITY TESTING"
     echo "Matrix: ${#CLIENTS[@]} Java client versions × ${#TBM_SERVER_PAIRS[@]} cluster pairs = $total combinations"
     echo "Results: $RESULTS_DIR"
+    for client_ver in "${CLIENTS[@]}"; do
+        for pair in "${TBM_SERVER_PAIRS[@]}"; do
+            expect_outcomes "java${client_ver}_server${pair/ /+}"
+        done
+    done
+    setup_python_env
     local start=$(date +%s)
     for client_ver in "${CLIENTS[@]}"; do
         for pair in "${TBM_SERVER_PAIRS[@]}"; do
@@ -586,18 +611,17 @@ main_tbm() {
 # Usage
 case "$1" in
     "--run")
-        setup_python_env  # Set up Python environment before running tests
-        main
+        main  # sets up the Python environment
         ;;
     "--tbm-run")
-        setup_python_env
         main_tbm
         ;;
     "--tbm-single")
-        if [ $# -ne 4 ]; then
+        if [[ $# -ne 4 ]]; then
             echo "Usage: $0 --tbm-single <client_version> <cluster_a_version> <cluster_b_version>"
             exit 1
         fi
+        expect_outcomes "java${2}_server${3}+${4}"
         setup_python_env
         run_tbm_test "$2" "$3" "$4"
         SINGLE_RC=$?
@@ -611,6 +635,7 @@ case "$1" in
             echo "Usage: $0 --single <client_version> <server_version>"
             exit 1
         fi
+        expect_outcomes "java${2}_server${3}"
         setup_python_env  # Set up Python environment before running tests
         run_compatibility_test $2 $3
         SINGLE_RC=$?

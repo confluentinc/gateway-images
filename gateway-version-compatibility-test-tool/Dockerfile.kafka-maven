@@ -4,8 +4,14 @@
 # manager to install a JDK and Maven with.)
 FROM maven:3.9.9-eclipse-temurin-11
 
-# Create directories for test results
-RUN mkdir -p /junit-results /html-results
+# Run as an unprivileged user, not the base image's root: the tests only need to read the
+# project copied into /tmp and the mounted certificates, and write the report directories and
+# their own Maven repository (MAVEN_CONFIG, which the base image points at /root/.m2).
+RUN useradd --create-home --uid 10001 tester \
+    && mkdir -p /junit-results /html-results \
+    && chown tester:tester /junit-results /html-results
+ENV MAVEN_CONFIG=/home/tester/.m2
+USER tester
 
 WORKDIR /tmp
 
