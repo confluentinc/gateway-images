@@ -1,5 +1,9 @@
 package com.confluent.kafka.testing;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -9,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.admin.Admin;
@@ -60,7 +63,8 @@ public class DynamicRoutingTest {
   private static final String CLUSTER_A = System.getProperty("tbm.cluster.a.bootstrap", "kafka-server:9092");
   private static final String CLUSTER_B = System.getProperty("tbm.cluster.b.bootstrap");
   private static final String TRUSTSTORE = "/etc/kafka/secrets/kafka.truststore.jks";
-  private static final String TRUSTSTORE_PASSWORD = "confluent";
+  // Written by generate_ssl_certificates next to the truststore (the same file the gateway reads).
+  private static final String TRUSTSTORE_CREDS = "/etc/kafka/secrets/truststore_creds";
 
   // Unique per run: the clusters outlive a failed run's cleanup only until compose down.
   private static final String RUN = Long.toString(System.currentTimeMillis(), 36);
@@ -172,7 +176,7 @@ public class DynamicRoutingTest {
     props.put(AdminClientConfig.SECURITY_PROTOCOL_CONFIG, "SSL");
     props.put("ssl.endpoint.identification.algorithm", "");
     props.put("ssl.truststore.location", TRUSTSTORE);
-    props.put("ssl.truststore.password", TRUSTSTORE_PASSWORD);
+    props.put("ssl.truststore.password", truststoreCredential());
     return props;
   }
 
@@ -228,14 +232,28 @@ public class DynamicRoutingTest {
     return total;
   }
 
-  private static boolean await(Callable<Boolean> condition) throws Exception {
+  private static String truststoreCredential() {
+    try {
+      return new String(Files.readAllBytes(Paths.get(TRUSTSTORE_CREDS)), StandardCharsets.UTF_8).trim();
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot read " + TRUSTSTORE_CREDS, e);
+    }
+  }
+
+  /** A condition to poll: unlike {@code Callable<Boolean>}, it yields a primitive boolean. */
+  @FunctionalInterface
+  private interface Condition {
+    boolean holds() throws Exception;
+  }
+
+  private static boolean await(Condition condition) throws Exception {
     long deadline = System.currentTimeMillis() + TIMEOUT_MS;
     while (System.currentTimeMillis() < deadline) {
-      if (condition.call()) {
+      if (condition.holds()) {
         return true;
       }
       Thread.sleep(500);
     }
-    return condition.call();
+    return condition.holds();
   }
 }

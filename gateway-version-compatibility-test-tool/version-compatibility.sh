@@ -406,6 +406,7 @@ mark_setup_failed() {
 # _status.txt), e.g. the run died part way.
 expect_outcomes() {
     printf '%s\n' "$@" >> "$RESULTS_DIR/expected_combinations.txt"
+    return 0
 }
 
 # run_tbm_test <client> <cluster A server> <cluster B server>: DynamicRoutingTest through one
