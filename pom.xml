@@ -49,7 +49,7 @@
             <dependency>
                 <groupId>io.confluent</groupId>
                 <artifactId>utility-belt</artifactId>
-                <version>8.4.0</version>
+                <version>8.4.1</version>
             </dependency>
 
             <dependency>
@@ -156,16 +156,16 @@
         -->
 
         <!-- Base Image Versions -->
-        <ubi9-minimal.image.version>9.8-1790074235</ubi9-minimal.image.version>
+        <ubi9-minimal.image.version>9.9-1795001629</ubi9-minimal.image.version>
 
         <!-- OS Package Versions -->
         <ubi9-minimal.temurin-21-jdk.version>21.0.12.1.0.1-0</ubi9-minimal.temurin-21-jdk.version>
 
         <!-- GitHub Repository Tags -->
-        <git-repo.cp-docker-utils.tag>v1.0.18</git-repo.cp-docker-utils.tag>
+        <git-repo.cp-docker-utils.tag>v1.0.21</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.27.1-trixie</golang.image.version>
+        <golang.image.version>1.27.4-trixie</golang.image.version>
 
     </properties>
 </project>
