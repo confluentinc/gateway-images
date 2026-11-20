@@ -51,7 +51,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson</groupId>
                 <artifactId>jackson-bom</artifactId>
-                <version>2.22.4</version>
+                <version>2.23.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -64,7 +64,7 @@
             <dependency>
                 <groupId>at.yawk.lz4</groupId>
                 <artifactId>lz4-java</artifactId>
-                <version>1.12.1</version>
+                <version>1.14.0</version>
             </dependency>
 
             <dependency>
@@ -174,18 +174,18 @@
         <app.gid>1000</app.gid>
 
         <!-- Base Image Versions -->
-        <ubi9.image.version>9.8-1793179168</ubi9.image.version>
-        <ubi9-micro.image.version>9.8-1791895366</ubi9-micro.image.version>
+        <ubi9.image.version>9.9-1794999017</ubi9.image.version>
+        <ubi9-micro.image.version>9.9-1794478307</ubi9-micro.image.version>
 
         <!-- OS Package Versions -->
         <ubi9.temurin-25-jdk.version>25.0.5.0.0.8</ubi9.temurin-25-jdk.version>
-        <ubi9.shadow-utils.version>4.9-16.el9</ubi9.shadow-utils.version>
+        <ubi9.shadow-utils.version>4.9-17.el9</ubi9.shadow-utils.version>
 
         <!-- GitHub Repository Tags -->
-        <git-repo.cp-docker-utils.tag>v1.0.19</git-repo.cp-docker-utils.tag>
+        <git-repo.cp-docker-utils.tag>v1.0.21</git-repo.cp-docker-utils.tag>
 
         <!-- Docker Hub Images -->
-        <golang.image.version>1.27.3-trixie</golang.image.version>
+        <golang.image.version>1.27.4-trixie</golang.image.version>
 
     </properties>
 </project>
