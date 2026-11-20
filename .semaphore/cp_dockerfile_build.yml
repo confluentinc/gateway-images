@@ -351,7 +351,9 @@ blocks:
             - export S390X_DOCKER_DEV_FULL_IMAGES=${DOCKER_DEV_FULL_IMAGES// /$S390X_ARCH }$S390X_ARCH
             # Register QEMU binfmt handlers for s390x cross-compilation
             - docker run --rm --privileged tonistiigi/binfmt --install s390x
-            - export OS_PACKAGES_URL=$(echo "$PACKAGES_URL" | sed "s/PACKAGE_TYPE/rpm/g")
+            # s390x packages publish on their own channel, under confluent-gateway/s390x/ beside the public tree
+            - export OS_PACKAGES_URL=$(echo "${PACKAGES_URL/\/confluent-gateway\///confluent-gateway/s390x/}" | sed "s/PACKAGE_TYPE/rpm/g")
+            - '[[ "$OS_PACKAGES_URL" == */confluent-gateway/s390x/* ]] || { echo "Could not derive the s390x packages URL from $PACKAGES_URL"; exit 1; }'
             - export PACKAGING_BUILD_ARGS="$PACKAGING_BUILD_ARGS -DCONFLUENT_PACKAGES_REPO=$OS_PACKAGES_URL"
             - ci-tools ci-update-version --direct-pom-edit
             - mvn -Dmaven.wagon.http.retryHandler.count=3 --batch-mode -P jenkins,docker-fabric8 clean package dependency:analyze validate -U -Ddocker.registry=$DOCKER_DEV_REGISTRY
