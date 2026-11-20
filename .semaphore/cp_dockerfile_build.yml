@@ -34,6 +34,7 @@ global_job_config:
         ==========================
         GATEWAY_VERSION: $GATEWAY_VERSION
         PACKAGES_URL: $PACKAGES_URL
+        S390X_PACKAGES_URL: $S390X_PACKAGES_URL
         PACKAGES_MAVEN_URL: $PACKAGES_MAVEN_URL
         PACKAGING_BUILD_NUMBER: $PACKAGING_BUILD_NUMBER
         ALLOW_UNSIGNED: $ALLOW_UNSIGNED
@@ -74,8 +75,8 @@ global_job_config:
       - export AMD_ARCH=.amd64
       - export ARM_ARCH=.arm64
       - export S390X_ARCH=.s390x
-      # s390x packages publish on their own channel, under confluent-gateway/s390x/ beside the public tree
-      - export S390X_PACKAGES_URL="${PACKAGES_URL/\/confluent-gateway\///confluent-gateway/s390x/}"
+      # Packaging passes the s390x channel's URL; for triggers that don't, derive it from the public tree's
+      - export S390X_PACKAGES_URL="${S390X_PACKAGES_URL:-${PACKAGES_URL/\/confluent-gateway\///confluent-gateway/s390x/}}"
       # The s390x agents reach S3 through an interface VPC endpoint, which serves only the s3.us-west-2 hostnames
       - export S390X_PACKAGES_URL="${S390X_PACKAGES_URL/s3-us-west-2.amazonaws.com/s3.us-west-2.amazonaws.com}"
 blocks:
