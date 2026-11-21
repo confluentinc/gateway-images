@@ -31,7 +31,7 @@ cd gateway-version-compatibility-test-tool
 # Set up Python environment (one-time setup)
 ./version-compatibility.sh --setup-env
 
-# Run all compatibility tests (16 combinations)
+# Run all compatibility tests (11 client x 11 server versions, CP 7.4.0-8.4.0)
 ./version-compatibility.sh --run
 
 # Or test a single combination
@@ -42,8 +42,10 @@ cd gateway-version-compatibility-test-tool
 
 | Command | Description |
 |---------|-------------|
-| `--run` | Run all test combinations |
+| `--run` | Run all test combinations (`SHARD=<i>/<n>`: only the i-th of n slices) |
 | `--single <client> <server>` | Test single client-server combination |
+| `--tbm-run` | Run topic-based routing (two clusters): every client x `TBM_SERVER_PAIRS` |
+| `--tbm-single <client> <cluster A> <cluster B>` | Test one topic-based routing combination |
 | `--parse <results_dir>` | Re-parse existing results |
 | `--setup-env` | Set up Python environment only |
 
@@ -71,6 +73,30 @@ cd gateway-version-compatibility-test-tool
    - `kafka-consumer-groups` - Consumer group operations
 3. **Metrics Collection**: Scrape Prometheus metrics from gateway
 4. **Report Generation**: Parse metrics and generate compatibility reports
+
+## Topic-Based Routing (TBM)
+
+`--tbm-run` / `--tbm-single` test one dynamic (topic-based) gateway route over two Kafka clusters
+(`docker-compose-tbm.yml`): cluster A holds `tbm-a-*` topics and the consumer groups (the
+coordination cluster), cluster B holds `tbm-b-*` topics. Both run KRaft at every version. The
+route uses the host (SNI) broker strategy, so clients connect over TLS to
+`gateway.tbm.test:19400`.
+
+`DynamicRoutingTest` acts through the gateway and checks each cluster directly: topics are
+created and deleted on the cluster their name routes to, an idempotent producer's records land
+there, and one consumer group reads both clusters with its offsets on cluster A. It covers only
+the APIs the dynamic router serves (it rejects others, e.g. transactions), so
+`AdvancedKafkaTest` isn't run here. Offsets are committed for cluster A's topic only: the router
+forwards commits to the coordination cluster, which rejects a topic it doesn't have.
+
+`TBM_SERVER_PAIRS` holds same-version pairs plus oldest/newest mixes: the router advertises only
+the API versions both clusters support. Results use the same layout and reports, with the
+server column reading `<cluster A>+<cluster B>`.
+
+In CI (`.semaphore/version_compatibility_tests.yml`, weekly) the standard matrix runs in three
+parallel slices and TBM in a job of its own; a Report job merges each suite's results
+(`ci-report.sh`), uploads them to S3 (`version-testing-results/` and
+`version-testing-results-tbm/`) and posts one Slack message per suite.
 
 ## Generated Reports
 
@@ -162,7 +188,10 @@ curl -s http://localhost:9190/metrics | grep kroxylicious
 ```
 gateway-version-compatibility-test-tool/
 ├── version-compatibility.sh      # Main test script
-├── docker-compose.yml            # Container orchestration
+├── docker-compose.yml            # Container orchestration (ZooKeeper servers)
+├── docker-compose-kraft.yml      # Container orchestration (8.0.0+ KRaft servers)
+├── docker-compose-tbm.yml        # Two clusters behind one dynamic route (TBM)
+├── ci-report.sh / ci-push-results.sh  # CI: merge, upload and notify per suite
 ├── enhanced_metrics_parser.py    # Advanced metrics parser
 ├── api_keys.py                   # Kafka API mappings
 ├── requirements.txt              # Python dependencies
@@ -174,6 +203,7 @@ Update the version arrays in `version-compatibility.sh`:
 ```bash
 CLIENTS=("7.9.0" "8.1.0")
 SERVERS=("7.9.0" "8.1.0")
+TBM_SERVER_PAIRS=("7.9.0 8.1.0")
 ```
 
 ## Contributing
