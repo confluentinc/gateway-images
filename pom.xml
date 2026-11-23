@@ -60,6 +60,12 @@
                 <artifactId>utility-belt</artifactId>
                 <version>8.4.1</version>
             </dependency>
+            <!-- temporary: kafka-clients from common pulls zstd-jni 1.5.6-10 (CVE-2026-87795 and others), remove once common manages zstd-jni >= 1.5.7-14 -->
+            <dependency>
+                <groupId>com.github.luben</groupId>
+                <artifactId>zstd-jni</artifactId>
+                <version>1.5.7-17</version>
+            </dependency>
             <!-- the released common 8.3.2 that release builds pin to pulls lz4-java 1.11.1 via kafka-clients -->
             <dependency>
                 <groupId>at.yawk.lz4</groupId>
