@@ -378,6 +378,8 @@ blocks:
             - . publish-test-results
             - artifact push workflow target/test-results
             - artifact push workflow target --destination target-S390X
+  # The Deploy S390X blocks run on the default amd64 agent: prod ECR denies writes from outside the AWS VPC and the
+  # s390x pool is outside it (common-docker#2645)
   - name: Deploy S390X confluentinc/cpc-gateway
     dependencies: ["Build S390X"]
     run:
