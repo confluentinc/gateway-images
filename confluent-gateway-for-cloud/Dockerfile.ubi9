@@ -46,10 +46,10 @@ COPY --from=build-utilities /go/bin/package_dedupe /usr/local/bin/package_dedupe
 
 RUN printf "[temurin-jre] \n\
 name=temurin-jre \n\
-baseurl=https://adoptium.jfrog.io/artifactory/rpm/rhel/\$releasever/\$basearch \n\
+baseurl=https://packages.adoptium.net/artifactory/rpm/rhel/\$releasever/\$basearch \n\
 enabled=1 \n\
 gpgcheck=1 \n\
-gpgkey=https://adoptium.jfrog.io/artifactory/api/gpg/key/public \n\
+gpgkey=https://packages.adoptium.net/artifactory/api/gpg/key/public \n\
 " > /etc/yum.repos.d/adoptium.repo \
     && rpm --import "${CONFLUENT_PACKAGES_REPO}/archive.key" \
     && printf "[Confluent] \n\
