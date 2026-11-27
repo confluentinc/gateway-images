@@ -1,0 +1,48 @@
+# Gateway configuration example using NODE-WILDCARD certificates
+# This configuration uses per-node wildcard certificates
+# Each node has its own certificate covering: *.$(gatewayNodeId).kafka.gateway.local
+#
+# Usage:
+# 1. Generate certificates: export CERT_APPROACH=node-wildcard GATEWAY_NODE_ID=gw-0 && ./generate-ssl.sh
+# 2. Start gateway: export GATEWAY_NODE_ID=gw-0 && gateway start
+#
+# The $(gatewayNodeId) placeholder will be replaced with the GATEWAY_NODE_ID value
+gateway:
+  admin:
+    endpoints:
+      metrics: true
+  streamingDomains:
+    - name: sample-domain
+      type: kafka
+      kafkaCluster:
+        name: kafka-cluster-1
+        bootstrapServers:
+          - id: localkafka
+            endpoint: "kafka-1:44444" # <----- kafka internal listener endpoint
+  routes:
+    - name: sni-route
+      endpoint: "kafka.gateway.local:19092"
+      brokerIdentificationStrategy:
+        type: host
+        # Node wildcard certificate covers: *.gw-0.kafka.gateway.local
+        # Pattern: broker0.gw-0.kafka.gateway.local, broker1.gw-0.kafka.gateway.local, etc.
+        pattern: "broker$(nodeId).$(gatewayNodeId).kafka.gateway.local"
+      streamingDomain:
+        name: sample-domain
+        bootstrapServerId: localkafka
+      security:
+        auth: passthrough
+        ssl:
+          truststore:
+            # Node-specific truststore (same CA, can be shared)
+            location: /etc/gateway/$(gatewayNodeId).truststore.jks
+            password:
+              file: /etc/gateway/$(gatewayNodeId).truststore.pwd
+          keystore:
+            # Node-specific keystore with wildcard certificate for this node
+            location: /etc/gateway/$(gatewayNodeId).keystore.jks
+            password:
+              file: /etc/gateway/$(gatewayNodeId).keystore.pwd
+            keyPassword:
+              file: /etc/gateway/$(gatewayNodeId).key.pwd
+          clientAuth: required
